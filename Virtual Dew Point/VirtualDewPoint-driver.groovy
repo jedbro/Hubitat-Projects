@@ -1,7 +1,7 @@
 // V0.02  Virtual Dew Point Device
 
 metadata {
-    definition (name: "Virtual DewPoint", namespace: "JohnRob", author: "several") {
+    definition (name: "Virtual DewPoint", namespace: "JohnRob", author: "several", importUrl: "https://raw.githubusercontent.com/jedbro/Hubitat-Projects/main/Virtual%20Dew%20Point/VirtualDewPoint-driver.groovy") {
         capability  "Sensor"
         command     "setDewPoint", ["NUMBER"]   // this will be a method.  [] may cause an input box to be created must test.
         attribute   "DewPoint", "Number"      // this will go into the Hub database
