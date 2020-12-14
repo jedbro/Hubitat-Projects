@@ -16,7 +16,7 @@ definition(
     category: "Convenience",
     iconUrl: "",
     iconX2Url: "",
-    importUrl: "")
+    importUrl: "https://raw.githubusercontent.com/jedbro/Hubitat-Projects/main/Virtual%20Dew%20Point/VirtualDewPoint-app.groovy")
 
 preferences {
     page(name: "mainPage")
