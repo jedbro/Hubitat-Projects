@@ -60,6 +60,7 @@ def updated() {
 }
 
 def initialize() {  
+    state.combinedState = ""
     // Do the initial poll
     poll()
     // Schedule it to run every 3 hours
@@ -114,6 +115,7 @@ def parse(response) {
     if (json.dns_queries_today){
         if (json.dns_queries_today.toInteger() >= 0) {
             def combinedValue = "Queries today: " +json.dns_queries_today + " Blocked: " + json.ads_blocked_today + "\nClients: " + json.unique_clients
+            state.combinedState = combinedValue
             sendEvent(name: "combined", value: combinedValue, unit: "")
         }
     }
