@@ -85,7 +85,7 @@ def poll() {
     }
     def hosthex = convertIPtoHex(deviceIP).toUpperCase()
     def porthex = convertPortToHex(getPort()).toUpperCase()
-    def path = getApiPath() + "?status" + "&auth=" + apiToken
+    def path = getApiPath() + "?summaryRaw" + "&auth=" + apiToken
     device.deviceNetworkId = "$hosthex:$porthex" 
     def hostAddress = "$deviceIP:$port"
     def headers = [:] 
