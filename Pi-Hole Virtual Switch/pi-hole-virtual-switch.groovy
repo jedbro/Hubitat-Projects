@@ -3,7 +3,9 @@
  *
  *  Copyright 2018 Nick Veenstra
  *  Convert to Hubitat by cuboy29
- *  Updated by harriscd Aug '20 & Jed Brown Mar '21
+ *  Updated;
+ *  - Aug '20 / Mar '21 - Hubitat Community Forum Release with contributions from harriscd & Jed Brown
+ *  - Jan 10th, 2023 - Updated to fix 'polling' per the API status changes in Pi-Hole.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -64,7 +66,8 @@ def initialize() {
     // Do the initial poll
     poll()
     // Schedule it to run every 3 hours
-    runEvery3Hours("poll")
+    //runEvery3Hours("poll")
+    runEvery15Minutes("poll")
     //runEvery5Minutes("poll") 
     //options runEvery__Minutes = 1, 5, 10, 15, 30
     //options runEvery1Hour, runEvery3Hours
@@ -82,7 +85,7 @@ def poll() {
     }
     def hosthex = convertIPtoHex(deviceIP).toUpperCase()
     def porthex = convertPortToHex(getPort()).toUpperCase()
-    def path = getApiPath()
+    def path = getApiPath() + "?status" + "&auth=" + apiToken
     device.deviceNetworkId = "$hosthex:$porthex" 
     def hostAddress = "$deviceIP:$port"
     def headers = [:] 
