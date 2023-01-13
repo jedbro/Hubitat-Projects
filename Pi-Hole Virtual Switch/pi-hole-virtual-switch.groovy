@@ -6,7 +6,7 @@
  * Revision History
  *  v 2020.08 - Hubitat Community Forum Release with contributions from harriscd & Jed Brown
  *  v 2023.01.10 - Updated to fix 'polling' per the API status changes in Pi-Hole.
- *  v 2023.01.12 - Added toggle for debuging & API Key is optional, and simplified code
+ *  v 2023.01.12 - Added toggle for debuging, made api token optional, simplified code, added documentation
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -75,7 +75,7 @@ def initialize() {
 
 }
 def refresh() {
-    poll()
+    makeCall()
 }
 
 def poll() {
@@ -92,13 +92,13 @@ def makeCall(toggle) {
     def porthex = convertPortToHex(getPort()).toUpperCase()
     def path = getApiPath()
     if (toggle == null) { 
-        path = path + "?summaryRaw"
+        path = path + "?summaryRaw"  //Used to poll and get stats
     } else {
-        path = path +"?" + toggle
+        path = path +"?" + toggle //Used to set Enabled or Disabled
     }
 
     if (apiToken != null) {
-        path = path + "&auth=" + apiToken
+        path = path + "&auth=" + apiToken //Used if Pi-Hole has security enabled and user has supplied a token to use
     }
     if (isDebug)  { log.debug "Pi-Hole vSwitch: API Path: " + path }
 
