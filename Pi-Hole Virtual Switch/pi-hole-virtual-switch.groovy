@@ -3,9 +3,10 @@
  *
  *  Copyright 2018 Nick Veenstra
  *  Convert to Hubitat by cuboy29
- *  Updated;
- *  - Aug '20 / Mar '21 - Hubitat Community Forum Release with contributions from harriscd & Jed Brown
- *  - Jan 10th, 2023 - Updated to fix 'polling' per the API status changes in Pi-Hole.
+ * Revision History
+ *  v 2020.08 - Hubitat Community Forum Release with contributions from harriscd & Jed Brown
+ *  v 2023.01.10 - Updated to fix 'polling' per the API status changes in Pi-Hole.
+ *  v 2023.01.12 - Added toggle for debuging & authkey is optional
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -31,8 +32,9 @@ metadata {
     preferences {
         section ("Settings") {
             input name: "deviceIP", type:"text", title:"Pi-home IP address", required: true
-            input name: "apiToken", type: "text", title: "API token", required: true
+            input name: "apiToken", type: "text", title: "API token", required: false
             input "disableTime", "number", title: "Disable time in minutes.<br>(1..1440; Blank = indefinitely)", required: false, range: "1..1440"
+            input "isDebug", "bool", title: "Enable Debug Logging", required: false, multiple: false, defaultValue: false, submitOnChange: true
 
          }
     }
@@ -48,15 +50,15 @@ private getApiPath() {
 }
 
 def installed() {
-    log.debug "Installed with settings: ${settings}"
+    if (isDebug)  { log.debug "Pi-Hole vSwitch: Installed with settings: ${settings}" }
 }
 
 def uninstalled() {
-    log.debug "uninstalled()"
+    if (isDebug)  { log.debug "Pi-Hole vSwitch: uninstalled()" }
 }
 
 def updated() {
-    log.debug "Updated with settings: ${settings}"
+    if (isDebug)  { log.debug "Pi-Hole vSwitch: Updated with settings: ${settings}" }
 
     initialize()
 }
@@ -65,7 +67,7 @@ def initialize() {
     state.combinedState = ""
     // Do the initial poll
     poll()
-    // Schedule it to run every 3 hours
+    // Schedule it to run every 15 minutes
     //runEvery3Hours("poll")
     runEvery15Minutes("poll")
     //runEvery5Minutes("poll") 
@@ -80,12 +82,17 @@ def refresh() {
 def poll() {
 
     if (deviceIP == null) {
-        log.debug "IP address missing in preferences"
+        if (isDebug)  { log.debug "IP address missing in preferences" }
         return
     }
     def hosthex = convertIPtoHex(deviceIP).toUpperCase()
     def porthex = convertPortToHex(getPort()).toUpperCase()
-    def path = getApiPath() + "?summaryRaw" + "&auth=" + apiToken
+    def path = getApiPath() + "?summaryRaw"
+    if (apiToken != null) {
+        path = path + "&auth=" + apiToken
+    }
+    if (isDebug)  { log.debug "Pi-Hole vSwitch: API Path: " + path }
+
     device.deviceNetworkId = "$hosthex:$porthex" 
     def hostAddress = "$deviceIP:$port"
     def headers = [:] 
@@ -103,9 +110,11 @@ def poll() {
 
 def parse(response) {
     
-    log.debug "Parsing '${response}'"
+    if (isDebug)  { log.debug "Pi-Hole vSwitch: Parsing '${response}'" }
+
     def json = response.json
-    log.debug "Received '${json}'"
+    if (isDebug)  { log.debug "Pi-Hole vSwitch: Received '${json}'" }
+
     if (json.FTLnotrunning) {
         return
     }
@@ -141,12 +150,18 @@ def off() {
 def doSwitch(toggle) {
     
     if (deviceIP == null) {
-        log.debug "IP address missing in preferences"
+        if (isDebug)  { log.debug "Pi-Hole vSwitch: IP address missing in preferences" }
         return
     }
     def hosthex = convertIPtoHex(deviceIP).toUpperCase()
     def porthex = convertPortToHex(getPort()).toUpperCase()
-    def path = getApiPath() + "?" + toggle + "&auth=" + apiToken
+    //def path = getApiPath() + "?" + toggle + "&auth=" + apiToken
+    def path = getApiPath() + "?" + toggle
+    if (apiToken != null) {
+        path = path + "&auth=" + apiToken
+    }
+    if (isDebug)  { log.debug "Pi-Hole vSwitch: API Path: " + path }
+
     device.deviceNetworkId = "$hosthex:$porthex" 
     def hostAddress = "$deviceIP:$port"
     def headers = [:] 
@@ -162,11 +177,12 @@ def doSwitch(toggle) {
     sendHubCommand(hubAction)
 }
 
+
 def lastUpdated(time) {
     def timeNow = now()
     def lastUpdate = ""
     if(location.timeZone == null) {
-        log.debug "Cannot set update time : location not defined in app"
+        if (isDebug)  { log.debug "Pi-Hole vSwitch: Cannot set update time : location not defined in app" }
     }
     else {
         lastUpdate = new Date(timeNow).format("MMM dd yyyy HH:mm", location.timeZone)
