@@ -6,7 +6,7 @@
  * Revision History
  *  v 2020.08 - Hubitat Community Forum Release with contributions from harriscd & Jed Brown
  *  v 2023.01.10 - Updated to fix 'polling' per the API status changes in Pi-Hole.
- *  v 2023.01.12 - Added toggle for debuging & authkey is optional
+ *  v 2023.01.12 - Added toggle for debuging & API Key is optional, and simplified code
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -66,11 +66,10 @@ def updated() {
 def initialize() {  
     state.combinedState = ""
     // Do the initial poll
-    poll()
+    makeCall()
+
     // Schedule it to run every 15 minutes
-    //runEvery3Hours("poll")
-    runEvery15Minutes("poll")
-    //runEvery5Minutes("poll") 
+    runEvery15Minutes("makeCall")
     //options runEvery__Minutes = 1, 5, 10, 15, 30
     //options runEvery1Hour, runEvery3Hours
 
@@ -80,14 +79,24 @@ def refresh() {
 }
 
 def poll() {
+    makeCall()
+}
+
+def makeCall(toggle) {
 
     if (deviceIP == null) {
-        if (isDebug)  { log.debug "IP address missing in preferences" }
+        if (isDebug)  { log.debug "Pi-Hole vSwitch: IP address missing in preferences" }
         return
     }
     def hosthex = convertIPtoHex(deviceIP).toUpperCase()
     def porthex = convertPortToHex(getPort()).toUpperCase()
-    def path = getApiPath() + "?summaryRaw"
+    def path = getApiPath()
+    if (toggle == null) { 
+        path = path + "?summaryRaw"
+    } else {
+        path = path +"?" + toggle
+    }
+
     if (apiToken != null) {
         path = path + "&auth=" + apiToken
     }
@@ -137,46 +146,13 @@ def parse(response) {
 }
 
 def on() {
-    doSwitch("enable")
+    makeCall("enable")
 }
-
 
 def off() {
     // Empty will remain off. Any value will be a countdown in minutes to turn back on
-    doSwitch((disableTime) ? "disable=" + (disableTime * 60) : "disable")
-    //doSwitch("disable")
+    makeCall((disableTime) ? "disable=" + (disableTime * 60) : "disable")
 }
-
-def doSwitch(toggle) {
-    
-    if (deviceIP == null) {
-        if (isDebug)  { log.debug "Pi-Hole vSwitch: IP address missing in preferences" }
-        return
-    }
-    def hosthex = convertIPtoHex(deviceIP).toUpperCase()
-    def porthex = convertPortToHex(getPort()).toUpperCase()
-    //def path = getApiPath() + "?" + toggle + "&auth=" + apiToken
-    def path = getApiPath() + "?" + toggle
-    if (apiToken != null) {
-        path = path + "&auth=" + apiToken
-    }
-    if (isDebug)  { log.debug "Pi-Hole vSwitch: API Path: " + path }
-
-    device.deviceNetworkId = "$hosthex:$porthex" 
-    def hostAddress = "$deviceIP:$port"
-    def headers = [:] 
-    headers.put("HOST", hostAddress)
-
-    def hubAction = new hubitat.device.HubAction(
-        method: "GET",
-        path: path,
-        headers: headers,
-        null,
-        [callback : parse] 
-    )
-    sendHubCommand(hubAction)
-}
-
 
 def lastUpdated(time) {
     def timeNow = now()
