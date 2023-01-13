@@ -7,6 +7,7 @@
  *  v 2020.08 - Hubitat Community Forum Release with contributions from harriscd & Jed Brown
  *  v 2023.01.10 - Updated to fix 'polling' per the API status changes in Pi-Hole.
  *  v 2023.01.12 - Added toggle for debuging, made api token optional, simplified code, added documentation
+ *  v 2023.01.13 - fixed issue for pi-holes without passwords (no API Token)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -32,8 +33,8 @@ metadata {
     preferences {
         section ("Settings") {
             input name: "deviceIP", type:"text", title:"Pi-home IP address", required: true
-            input name: "apiToken", type: "text", title: "API token", required: false
-            input "disableTime", "number", title: "Disable time in minutes.<br>(1..1440; Blank = indefinitely)", required: false, range: "1..1440"
+            input name: "apiToken", type: "text", title: "API token<br>(Required if you have a password set on the pi-hole):", required: false
+            input "disableTime", "number", title: "Disable time in minutes<br>(1..1440; Blank = indefinitely):", required: false, range: "1..1440"
             input "isDebug", "bool", title: "Enable Debug Logging", required: false, multiple: false, defaultValue: false, submitOnChange: true
 
          }
@@ -99,6 +100,8 @@ def makeCall(toggle) {
 
     if (apiToken != null) {
         path = path + "&auth=" + apiToken //Used if Pi-Hole has security enabled and user has supplied a token to use
+    } else {
+        path = path + "&auth=" //so weird you have to include this
     }
     if (isDebug)  { log.debug "Pi-Hole vSwitch: API Path: " + path }
 
