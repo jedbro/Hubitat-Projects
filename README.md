@@ -1,21 +1,49 @@
-# Virtual Dew Point
+# Pi-hole Virtual Switch for Hubitat
 
-This repository is a host of the Virtual Dew Point - a great and simple driver for taking Humidity and Tempurature to calculate a DEW Point.
+This is an enhanced version of the **Pi-hole Virtual Switch** for Hubitat, originally created by [jedbro](https://github.com/jedbro). This driver allows you to control your Pi-hole instance from Hubitat, enabling on/off toggling, status checks, and automation integration.
 
-### DIY Version
+## 🚀 Features
 
-0. TBD
+- ✅ Enable or disable Pi-hole via a virtual switch in Hubitat.
+- 🔄 Check the current status of Pi-hole.
+- ⚡ Updated to comply with **Pi-hole v6 API changes**.
+- 📦 **Now installable via [Hubitat Package Manager (HPM)](https://github.com/dcmeglio/hubitat-packagemanager).**
 
+## 🔄 Why This Version?
 
-You should now be all set! Please note, however, that events will populate the bucket automatically as new events happen on your Hubitat network. Your history of events will build from when you setup the SmartApp forward, so, if you don't see any events in your Initial State bucket immediately, it's most likely because no events have occurred just yet!
+With the release of **Pi-hole v6**, changes in the API required updates to the original driver. This version ensures compatibility with the latest Pi-hole release while also improving code efficiency and maintainability.
 
-#### Virtual Dew Point is a fork of the fabulous work by [`JohnRob`](https://community.hubitat.com/t/my-first-app-and-how-i-stumbled-through-it-long-read/44611) with minimal changes/bug fixes to get it to run on my Hubitat.
+## 📦 Installation
 
+### **Hubitat Package Manager (Recommended)**
+1. Open **Hubitat Package Manager** in your Hubitat interface.
+2. Choose **Install** → **Search by Keywords**.
+3. Search for **Pi-hole Virtual Switch**.
+4. Click **Install** and follow the on-screen instructions.
 
-# Auto Door Lock Parent/Child
+### **Manual Installation**
+1. Open **Hubitat Web Interface** → **Drivers Code**.
+2. Click **+ New Driver** and paste the contents of [`pi-hole-virtual-switch.groovy`](pi-hole-virtual-switch.groovy).
+3. Save the driver.
+4. Go to **Devices** → **Add Virtual Device** and select **Pi-hole Virtual Switch** as the driver.
 
-This repository is a Fork/Host of the excellent [`Auto Door Lock app by csader`](https://github.com/csader/AutoLockDoor) with merges for Parent/Child structure by heidrickla, for use on my Hubitat.
+## ⚙️ Configuration
+1. After installing, open the device page in Hubitat.
+2. Enter your **Pi-hole API key** and **server URL** in the device preferences.
+3. Save the settings.
+4. Use Hubitat automation or dashboards to toggle Pi-hole on/off.
 
-### DIY Version
+## 🔄 Updates
+To update the driver via HPM:
+1. Open **Hubitat Package Manager**.
+2. Select **Update** → **Check for Updates**.
+3. If an update is available, follow the instructions to install.
 
-0. TBD
+## 🏆 Credits
+
+This project is based on the original [Pi-hole Virtual Switch](https://github.com/jedbro/Hubitat-Projects/blob/main/Pi-Hole%20Virtual%20Switch/pi-hole-virtual-switch.groovy) by [jedbro](https://github.com/jedbro). Significant improvements have been made to ensure compatibility with Pi-hole v6, enhance performance, and improve usability.
+
+## 📜 License
+This project is licensed under the [MIT License](LICENSE).
+
+---
