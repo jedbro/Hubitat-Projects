@@ -1,17 +1,18 @@
 # Pi-hole Virtual Switch for Hubitat
 
-This is an enhanced version of the **Pi-hole Virtual Switch** for Hubitat, originally created by [jedbro](https://github.com/jedbro). This driver allows you to control your Pi-hole instance from Hubitat, enabling on/off toggling, status checks, and automation integration.
+This is an enhanced version of the **Pi-hole Virtual Switch** for Hubitat, originally created by [Nick Veenstra](https://github.com/jedbro/Hubitat-Projects), with contributions from **cuboy29, harriscd, and Jed Brown**. This driver allows you to control your Pi-hole instance from Hubitat, enabling on/off toggling, status checks, and automation integration.
 
 ## 🚀 Features
 
 - ✅ Enable or disable Pi-hole via a virtual switch in Hubitat.
 - 🔄 Check the current status of Pi-hole.
-- ⚡ Updated to comply with **Pi-hole v6 API changes**.
+- ⚡ **Updated to comply with Pi-hole v6 API changes.**
 - 📦 **Now installable via [Hubitat Package Manager (HPM)](https://github.com/dcmeglio/hubitat-packagemanager).**
+- 🛠️ Improved code structure, better logging, and added authentication handling.
 
 ## 🔄 Why This Version?
 
-With the release of **Pi-hole v6**, changes in the API required updates to the original driver. This version ensures compatibility with the latest Pi-hole release while also improving code efficiency and maintainability.
+With the release of **Pi-hole v6**, the API structure changed, requiring updates to the original driver. This version ensures compatibility with the latest Pi-hole release while improving maintainability, security, and performance.
 
 ## 📦 Installation
 
@@ -41,9 +42,12 @@ To update the driver via HPM:
 
 ## 🏆 Credits
 
-This project is based on the original [Pi-hole Virtual Switch](https://github.com/jedbro/Hubitat-Projects/blob/main/Pi-Hole%20Virtual%20Switch/pi-hole-virtual-switch.groovy) by [jedbro](https://github.com/jedbro). Significant improvements have been made to ensure compatibility with Pi-hole v6, enhance performance, and improve usability.
+This project is based on the original [Pi-hole Virtual Switch](https://github.com/jedbro/Hubitat-Projects/blob/main/Pi-Hole%20Virtual%20Switch/pi-hole-virtual-switch.groovy) by **Nick Veenstra, cuboy29, harriscd, and Jed Brown**. 
+
+**Major updates for Pi-hole v6 compatibility and HPM support were made by [WalksOnAir](https://github.com/WalksOnAir).**
 
 ## 📜 License
-This project is licensed under the [MIT License](LICENSE).
+
+This project is licensed under the **Apache License, Version 2.0**. See the [`LICENSE`](LICENSE) file for details.
 
 ---
