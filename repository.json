@@ -6,6 +6,7 @@
       "id": "3b141d3b-36fb-492e-9766-8867256478de",
       "name": "Pi-hole Virtual Switch",
       "category": "Integrations",
+      "tags": ["LAN", "Monitoring", "Tools & Utilities", "Cloud"],
       "location": "https://raw.githubusercontent.com/walksonair/Hubitat-Pi-hole-Virtual-Switch/main/packageManifest.json",
       "description": "A virtual switch for controlling Pi-hole ad-blocking from Hubitat."
     }
