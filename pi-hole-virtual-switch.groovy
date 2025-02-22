@@ -45,6 +45,7 @@ metadata {
             input name: "deviceIP", type: "text", title: "Pi-hole IP address", required: true
             input name: "piPassword", type: "password", title: "Pi-hole Password (required):", required: true
             input name: "disableTime", type: "number", title: "Disable time in minutes (1..1440; Blank = indefinitely):", required: false, range: "1..1440"
+            input name: "pollingInterval", type: "number", title: "Polling Interval (minutes):", required: false, defaultValue: 10, range: "1..60"
             input name: "isDebug", type: "bool", title: "Enable Debug Logging", required: false, defaultValue: false
             input name: "redactSensitiveInfo", type: "bool", title: "Redact Sensitive Info in Logs", required: false, defaultValue: true
         }
@@ -84,7 +85,9 @@ def initialize() {
         authenticate()
     }
 
-    runEvery15Minutes("poll")
+    def interval = settings.pollingInterval ? settings.pollingInterval.toInteger() : 10
+    log.info "Setting polling interval to ${interval} minutes."
+    schedule("0 0/${interval} * * * ?", "poll")
 }
 
 def refresh() {
@@ -167,16 +170,21 @@ def off() {
 
 def handleOffResponse(hubitat.device.HubResponse response) {
     if (response.status == 200) {
-        log.info "Successfully disabled Pi-hole blocking."
+        log.info "Successfully disabled Pi-hole blocking. API Response: ${response.status}"
 
         def disableTimeInSeconds = (disableTime && disableTime > 0) ? disableTime * 60 : 0
 
         if (disableTimeInSeconds > 0) {
             def resumeTime = new Date(now() + (disableTimeInSeconds * 1000))
-            sendEvent(name: "blockingWillResumeAt", value: resumeTime.format("yyyy-MM-dd HH:mm:ss", location.timeZone))
+            def formattedResumeTime = resumeTime.format("yyyy-MM-dd HH:mm:ss", location.timeZone)
+
+            log.info "Pi-hole blocking will resume at: ${formattedResumeTime}"
+            sendEvent(name: "blockingWillResumeAt", value: formattedResumeTime)
             state.disableEndTime = now() + (disableTimeInSeconds * 1000)
+
             runEvery1Minute("updateBlockingResumeTime")
         } else {
+            log.warn "Pi-hole blocking is disabled indefinitely based on preferences."
             sendEvent(name: "blockingWillResumeAt", value: "Indefinitely Disabled")
             state.disableEndTime = null
         }
@@ -185,7 +193,7 @@ def handleOffResponse(hubitat.device.HubResponse response) {
 
         runIn(2, poll) 
     } else {
-        log.warn "Failed to disable Pi-hole blocking. API Response: ${response.status}"
+        log.error "Failed to disable Pi-hole blocking. API Response: ${response.status}"
         sendEvent(name: "blockingWillResumeAt", value: "N/A")
     }
 }
