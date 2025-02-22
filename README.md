@@ -7,7 +7,7 @@ This is an enhanced version of the **Pi-hole Virtual Switch** for Hubitat, origi
 - ✅ Enable or disable Pi-hole via a virtual switch in Hubitat.
 - 🔄 Check the current status of Pi-hole.
 - ⚡ **Updated to comply with Pi-hole v6 API changes.**
-- 📦 **Now installable via [Hubitat Package Manager (HPM)](https://github.com/dcmeglio/hubitat-packagemanager).**
+- 📦 **Now installable via [Hubitat Package Manager (HPM)](https://github.com/HubitatCommunity/hubitatpackagemanager).**
 - 🛠️ Improved code structure, better logging, and added authentication handling.
 
 ## 🔄 Why This Version?

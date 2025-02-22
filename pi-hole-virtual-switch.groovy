@@ -99,8 +99,16 @@ def poll() {
         sendEvent(name: "serviceStatus", value: "Unknown (Device Offline)")
         return
     }
-    
+
     sendEvent(name: "deviceStatus", value: "Online (Hardware OK)")
+
+    ensureSessionValid()
+
+    if (!testApiAvailability()) {
+        log.warn "Pi-hole API is unreachable or authentication failed. Re-authenticating..."
+        authenticate()
+        return
+    }
 
     sendRequest("GET", "/dns/blocking", null, "handleStatusResponse")
 }
@@ -201,11 +209,55 @@ def authenticate() {
 
     log.info "Attempting Pi-hole authentication..."
     state.sid = null
+    state.csrf = null
     sendEvent(name: "sessionValid", value: "authenticating")
 
-    def payload = [ "password": settings.piPassword.trim() ]
-    
-    sendRequest("POST", "/auth", payload, "handleAuthResponse", true)
+    def payload = new groovy.json.JsonBuilder([ "password": settings.piPassword.trim() ]).toString()
+
+    try {
+        def params = [
+            uri: "http://${deviceIP}:${getPort()}/api/auth",
+            headers: ["Content-Type": "application/json"],
+            body: payload,
+            timeout: 5
+        ]
+        
+        httpPost(params) { response ->
+            if (response.status == 200) {
+                def jsonResponse = response.data // ✅ Correct way to access response data
+                
+                if (jsonResponse?.session?.valid == true && jsonResponse.session?.sid) {
+                    state.sid = jsonResponse.session.sid  
+                    state.csrf = jsonResponse.session.csrf
+                    sendEvent(name: "sessionValid", value: "true") 
+                    sendEvent(name: "serviceStatus", value: "Online (Running)")
+                    log.info "Authenticated successfully. New Session ID: ${state.sid}, CSRF Token: ${state.csrf}"
+
+                    runIn(2, poll) // Retry polling after authentication
+                } else {
+                    log.warn "Authentication failed: No valid session ID returned."
+                    state.sid = null
+                    state.csrf = null
+                    sendEvent(name: "sessionValid", value: "false")
+                    runIn(10, authenticate) // Retry after 10 seconds
+                }
+            } else {
+                log.error "Authentication failed with status ${response.status}: ${response.data}"
+                state.sid = null
+                state.csrf = null
+                sendEvent(name: "sessionValid", value: "false")
+
+                def retryDelay = state.authRetryDelay ?: 5
+                runIn(retryDelay, authenticate)
+                state.authRetryDelay = Math.min(retryDelay * 2, 60)
+            }
+        }
+    } catch (Exception e) {
+        log.error "Error during authentication: ${e.message}"
+        state.sid = null
+        state.csrf = null
+        sendEvent(name: "sessionValid", value: "false")
+    }
 }
 
 def handleAuthResponse(hubitat.device.HubResponse response) {
@@ -305,18 +357,20 @@ def sendRequest(String method, String endpoint, Map payload, String callbackMeth
         "HOST": "${deviceIP}:${getPort()}"
     ]
 
+    // Attach authentication credentials if required
     if (!isAuth && state.sid) {
         headers["X-FTL-SID"] = state.sid
     }
-
     if (!isAuth && state.csrf) {
         headers["X-FTL-CSRF"] = state.csrf
     }
 
+    // For GET requests, append `sid` as a query parameter
     if (!isAuth && state.sid && method == "GET") {
         endpoint = "${endpoint}?sid=${URLEncoder.encode(state.sid, 'UTF-8')}"
     }
 
+    // For POST requests, include `sid` in the payload
     if (!isAuth && state.sid && method == "POST") {
         if (payload == null) {
             payload = [:]
@@ -346,31 +400,52 @@ def sendRequest(String method, String endpoint, Map payload, String callbackMeth
     }
 }
 
-private boolean testApiAvailability(String url, Map headers) {
+private boolean testApiAvailability() {
+    def url = "http://${deviceIP}:${getPort()}/api/dns/blocking"
+    def headers = ["Content-Type": "application/json"]
+
+    if (state.sid) {
+        headers["X-FTL-SID"] = state.sid
+    }
+    if (state.csrf) {
+        headers["X-FTL-CSRF"] = state.csrf
+    }
+
     try {
-        httpGet([
-            uri: url,
-            headers: headers,
-            timeout: 5
-        ]) { response ->
+        httpGet([uri: url, headers: headers, timeout: 5]) { response ->
             if (response.status == 200) {
-                logDebug("Pi-hole API is responsive (HTTP 200).")
+                logDebug("Pi-hole API is online (HTTP 200).")
                 sendEvent(name: "serviceStatus", value: "Online (Running)")
                 return true
             } else if (response.status == 401) {
                 log.warn "Pi-hole API returned 401 Unauthorized. Re-authenticating..."
-                authenticate()
-                runIn(5, poll) 
+                
+                state.sid = null
+                state.csrf = null
+                sendEvent(name: "sessionValid", value: "false")
+
+                authenticate()  // Re-authenticate
+                runIn(5, poll)  // Retry polling after authentication
                 return false
             } else {
-                log.warn "Pi-hole API responded with unexpected HTTP ${response.status}: ${response.statusText}"
+                log.warn "Unexpected Pi-hole API response: HTTP ${response.status}"
                 sendEvent(name: "serviceStatus", value: "Unknown API Error")
                 return false
             }
         }
     } catch (Exception e) {
         log.warn "Pi-hole API is unreachable: ${e.message}"
-        sendEvent(name: "serviceStatus", value: "Down (Service Unavailable)")
+
+        if (e.message.contains("Connection refused")) {
+            log.warn "Pi-hole service is DOWN (Connection Refused)."
+            sendEvent(name: "serviceStatus", value: "Down (Service Unavailable)")
+            sendEvent(name: "sessionValid", value: "false")
+            state.sid = null
+            state.csrf = null
+        } else {
+            sendEvent(name: "serviceStatus", value: "Unknown Network Error")
+        }
+
         return false
     }
 }
