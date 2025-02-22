@@ -24,7 +24,7 @@ With the release of **Pi-hole v6**, the API structure changed, requiring updates
 
 ### **Manual Installation**
 1. Open **Hubitat Web Interface** → **Drivers Code**.
-2. Click **+ New Driver** and paste the contents of [`pi-hole-virtual-switch.groovy`](pi-hole-virtual-switch.groovy).
+2. Click **+ New Driver** and paste the contents of [`pi-hole-virtual-switch.groovy`](https://raw.githubusercontent.com/walksonair/Hubitat-Pi-hole-Virtual-Switch/refs/heads/main/pi-hole-virtual-switch.groovy).
 3. Save the driver.
 4. Go to **Devices** → **Add Virtual Device** and select **Pi-hole Virtual Switch** as the driver.
 
@@ -42,7 +42,7 @@ To update the driver via HPM:
 
 ## 🏆 Credits
 
-This project is based on the original [Pi-hole Virtual Switch](https://github.com/jedbro/Hubitat-Projects/blob/main/Pi-Hole%20Virtual%20Switch/pi-hole-virtual-switch.groovy) by **Nick Veenstra, cuboy29, harriscd, and Jed Brown**. 
+This project is based on the original [Pi-hole Virtual Switch](https://github.com/jedbro/Hubitat-Projects/blob/main/Pi-Hole%20Virtual%20Switch/pi-hole-virtual-switch.groovy) by **Nick Veenstra, cuboy29, harriscd, and [Jed Brown](https://github.com/jedbro)**. 
 
 **Major updates for Pi-hole v6 compatibility and HPM support were made by [WalksOnAir](https://github.com/WalksOnAir).**
 
