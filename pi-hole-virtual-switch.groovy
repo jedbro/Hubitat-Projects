@@ -241,7 +241,7 @@ def authenticate() {
         
         httpPost(params) { response ->
             if (response.status == 200) {
-                def jsonResponse = response.data // ✅ Correct way to access response data
+                def jsonResponse = response.data
                 
                 if (jsonResponse?.session?.valid == true && jsonResponse.session?.sid) {
                     state.sid = jsonResponse.session.sid  
@@ -250,13 +250,13 @@ def authenticate() {
                     sendEvent(name: "serviceStatus", value: "Online (Running)")
                     log.info "Authenticated successfully. New Session ID: ${state.sid}, CSRF Token: ${state.csrf}"
 
-                    runIn(2, poll) // Retry polling after authentication
+                    runIn(2, poll)
                 } else {
                     log.warn "Authentication failed: No valid session ID returned."
                     state.sid = null
                     state.csrf = null
                     sendEvent(name: "sessionValid", value: "false")
-                    runIn(10, authenticate) // Retry after 10 seconds
+                    runIn(10, authenticate) 
                 }
             } else {
                 log.error "Authentication failed with status ${response.status}: ${response.data}"
@@ -374,7 +374,6 @@ def sendRequest(String method, String endpoint, Map payload, String callbackMeth
         "HOST": "${deviceIP}:${getPort()}"
     ]
 
-    // Attach authentication credentials if required
     if (!isAuth && state.sid) {
         headers["X-FTL-SID"] = state.sid
     }
@@ -382,12 +381,10 @@ def sendRequest(String method, String endpoint, Map payload, String callbackMeth
         headers["X-FTL-CSRF"] = state.csrf
     }
 
-    // For GET requests, append `sid` as a query parameter
     if (!isAuth && state.sid && method == "GET") {
         endpoint = "${endpoint}?sid=${URLEncoder.encode(state.sid, 'UTF-8')}"
     }
 
-    // For POST requests, include `sid` in the payload
     if (!isAuth && state.sid && method == "POST") {
         if (payload == null) {
             payload = [:]
@@ -441,8 +438,8 @@ private boolean testApiAvailability() {
                 state.csrf = null
                 sendEvent(name: "sessionValid", value: "false")
 
-                authenticate()  // Re-authenticate
-                runIn(5, poll)  // Retry polling after authentication
+                authenticate()
+                runIn(5, poll)
                 return false
             } else {
                 log.warn "Unexpected Pi-hole API response: HTTP ${response.status}"
