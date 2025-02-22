@@ -63,26 +63,27 @@ def updated() {
     state.previousDebug = isDebug
 
     if (previousDebug != null && previousDebug != isDebug) {
-        if (isDebug) {
-            log.info "Debug logging is ENABLED."
-        } else {
-            log.info "Debug logging is DISABLED."
-        }
+        log.info "Debug logging is ${isDebug ? 'ENABLED' : 'DISABLED'}."
     }
 
     initialize()
 }
 
 def initialize() {
-    state.sid = null
-    state.disableEndTime = null
-    sendEvent(name: "sessionValid", value: "unknown")
-    sendEvent(name: "timeRemaining", value: 0)
-
     if (isDebug == null) isDebug = false
 
     logDebug("Initializing Pi-hole Virtual Switch...")
-    authenticate()
+    
+    if (state.sid && device.currentValue("sessionValid") == "true") {
+        logDebug("Valid session found. Skipping authentication.")
+    } else {
+        logDebug("No valid session found. Re-authenticating...")
+        state.sid = null
+        state.csrf = null
+        sendEvent(name: "sessionValid", value: "unknown")
+        authenticate()
+    }
+
     runEvery15Minutes("poll")
 }
 
@@ -140,6 +141,10 @@ def handleOnResponse(hubitat.device.HubResponse response) {
 
         sendEvent(name: "blockingWillResumeAt", value: "N/A")
         state.disableEndTime = null
+        
+        sendEvent(name: "switch", value: "on")
+
+        runIn(2, poll) 
     } else {
         log.warn "Failed to enable Pi-hole blocking. API Response: ${response.status}"
     }
@@ -175,6 +180,10 @@ def handleOffResponse(hubitat.device.HubResponse response) {
             sendEvent(name: "blockingWillResumeAt", value: "Indefinitely Disabled")
             state.disableEndTime = null
         }
+        
+        sendEvent(name: "switch", value: "off")
+
+        runIn(2, poll) 
     } else {
         log.warn "Failed to disable Pi-hole blocking. API Response: ${response.status}"
         sendEvent(name: "blockingWillResumeAt", value: "N/A")
