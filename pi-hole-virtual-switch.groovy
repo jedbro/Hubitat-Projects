@@ -12,7 +12,8 @@
  *    - 2023.01.10: Updated to fix polling per API changes in Pi-hole
  *    - 2023.01.12: Added debugging toggle, optional API token, simplified code
  *    - 2023.01.13: Fixed issue for Pi-holes without passwords
- *    - 2025.02.25: Updated for Pi-hole v6 API changes, added HPM support (by WalksOnAir)
+ *    - 2025.02.21: Updated for Pi-hole v6 API changes, added HPM support (by WalksOnAir)
+ *    - 2025.02.22: Updated with user selectable port (by Alan_F)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  You may not use this file except in compliance with the License.
