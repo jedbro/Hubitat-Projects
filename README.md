@@ -46,8 +46,17 @@ This project is based on the original [Pi-hole Virtual Switch](https://github.co
 
 **Major updates for Pi-hole v6 compatibility and HPM support were made by [WalksOnAir](https://github.com/WalksOnAir).**
 
+### ❤️ Buy Me a Beer (or Coffee!)
+
+I'm a single papa raising two amazing kiddos, and building cool things like this keeps me motivated (and sane!).  
+If this has been useful to you, and you feel like saying thanks, you can **get me a beer or a coffee**—no pressure, just appreciation.  
+
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/walksonair)
+
+Cheers! 🍻
+
+---
+
 ## 📜 License
 
 This project is licensed under the **Apache License, Version 2.0**. See the [`LICENSE`](LICENSE) file for details.
-
----
