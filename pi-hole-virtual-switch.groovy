@@ -43,6 +43,7 @@ metadata {
     preferences {
         section ("Settings") {
             input name: "deviceIP", type: "text", title: "Pi-hole IP address", required: true
+            input name: "devicePort", type: "text", title: "Pi-hole Port (required)", required: true, defaultValue: "80"
             input name: "piPassword", type: "password", title: "Pi-hole Password (required):", required: true
             input name: "disableTime", type: "number", title: "Disable time in minutes (1..1440; Blank = indefinitely):", required: false, range: "1..1440"
             input name: "pollingInterval", type: "number", title: "Polling Interval (minutes):", required: false, defaultValue: 10, range: "1..60"
@@ -233,7 +234,7 @@ def authenticate() {
 
     try {
         def params = [
-            uri: "http://${deviceIP}:${getPort()}/api/auth",
+            uri: "http://${deviceIP}:${devicePort}/api/auth",
             headers: ["Content-Type": "application/json"],
             body: payload,
             timeout: 5
@@ -371,7 +372,7 @@ def sendRequest(String method, String endpoint, Map payload, String callbackMeth
 
     def headers = [
         "Content-Type": "application/json",
-        "HOST": "${deviceIP}:${getPort()}"
+        "HOST": "${deviceIP}:${devicePort}"
     ]
 
     if (!isAuth && state.sid) {
@@ -415,7 +416,7 @@ def sendRequest(String method, String endpoint, Map payload, String callbackMeth
 }
 
 private boolean testApiAvailability() {
-    def url = "http://${deviceIP}:${getPort()}/api/dns/blocking"
+    def url = "http://${deviceIP}:${devicePort}/api/dns/blocking"
     def headers = ["Content-Type": "application/json"]
 
     if (state.sid) {
@@ -470,9 +471,6 @@ def logDebug(msg) {
     }
 }
 
-def getPort() {
-    return 80
-}
 
 private redactSettings(settingsMap) {
     if (!settingsMap) return [:]
