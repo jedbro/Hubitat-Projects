@@ -1,0 +1,12 @@
+{
+    "author": "WalksOnAir",
+    "gitHubUrl": "https://github.com/WalksOnAir/hubitat-pihole-switch",
+    "packages": [
+      {
+        "name": "Pi-hole Virtual Switch",
+        "category": "Networking",
+        "location": "https://raw.githubusercontent.com/walksonair/Hubitat-Pi-hole-Virtual-Switch/main/pi-hole-virtual-switch.groovy",
+        "description": "A virtual switch for controlling Pi-hole ad-blocking from Hubitat."
+      }
+    ]
+  }

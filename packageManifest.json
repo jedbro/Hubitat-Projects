@@ -1,0 +1,18 @@
+{
+    "packageName": "Pi-hole Virtual Switch",
+    "minimumHEVersion": "2.1.9",
+    "author": "WalksOnAir",
+    "version": "6.0.0",
+    "dateReleased": "2025-02-25",
+    "licenseFile": "http://www.apache.org/licenses/LICENSE-2.0",
+    "releaseNotes": "Initial release for Hubitat Package Manager. Updated for Pi-hole v6 API and added HPM support.",
+    "drivers": [
+      {
+        "id": "16351a87-d416-48a7-ac95-38e1afee9e27",
+        "name": "Pi-hole Virtual Switch",
+        "namespace": "WalksOnAir",
+        "location": "https://raw.githubusercontent.com/walksonair/Hubitat-Pi-hole-Virtual-Switch/main/pi-hole-virtual-switch.groovy",
+        "required": true
+      }
+    ]
+  }
