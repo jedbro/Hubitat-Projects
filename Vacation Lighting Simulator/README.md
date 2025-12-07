@@ -71,6 +71,7 @@ You may install the app one of two ways.
 3. Select the package → Install.
 4. App will now appear under **Apps** in your Hubitat home.
 
+_Note:_ If you aren't finding it, try turning 'Fast Search' off in HPM.
 ---
 
 ## 🧩 **Option 2: Manual Installation**
