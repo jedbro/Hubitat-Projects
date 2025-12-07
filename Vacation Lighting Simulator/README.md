@@ -80,7 +80,7 @@ You may install the app one of two ways.
 3. Click **+ New App**  
 4. Paste in the contents of the `.groovy` file from GitHub:
 
-   ➡ **https://github.com/jedbro/Hubitat-Projects/blob/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy**
+   ➡ **[https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy](https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy)**
 
 5. Save  
 6. Go to **Apps** → **Add User App** → select **Vacation Lighting Simulator**
