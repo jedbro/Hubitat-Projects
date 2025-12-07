@@ -1,0 +1,17 @@
+{
+	"packageName": "Vacation Lighting Simulator",
+	"author": "Jed Brown",
+	"version": "0.2.4",
+	"minimumHEVersion": "0.0",
+	"dateReleased": "2025-12-06",
+	"apps" : [
+		{
+			"id" : "550e8400-e29b-41d4-a716-446655440000",
+			"name": "Vacation Lighting Simulator",
+			"namespace": "logicalnonsense",
+			"location": "https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy",
+			"required": true,
+			"oauth": false
+		}
+	]
+}
