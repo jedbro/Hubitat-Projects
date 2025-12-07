@@ -1,3 +1,11 @@
+# Vacation Lights Simulator
+
+This repository is for a very rich and enhanced Vacation Light Simulator
+
+### DIY Version
+
+0. 0.2.3 - First release
+
 # Virtual Dew Point
 
 This repository is a host of the Virtual Dew Point - a great and simple driver for taking Humidity and Tempurature to calculate a DEW Point.
