@@ -1,7 +1,7 @@
 /**
  *  Vacation Lighting Simulator
  *
- *  V0.2.4 - December 2025 Updated to:
+ *  V0.2.5 - December 2025 Updated to:
  *    - Turn on a set of lights during active time, and turn them off at end of vacation time
  *    - Instantly shut off when leaving configured modes / vacation switch
  *    - More pseudo random with per-light on duration = frequency_minutes ± ~20% (style B)
@@ -43,7 +43,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.2.4 • Dec 2025"
+@Field static final String APP_VERSION = "v0.2.5 • Dec 2025"
 
 definition(
     name: "Vacation Lighting Simulator",
@@ -1166,6 +1166,9 @@ private getTimeOk() {
     if (start && stop && getTimeZone()) {
         result = timeOfDayIsBetween(start, stop, new Date(), getTimeZone())
     }
+    // Help debug any timing problems
+    logDebug "getTimeOk(): start=${start}, stop=${stop}, now=${new Date()}, tz=${getTimeZone()}"
+    
     result
 }
 
