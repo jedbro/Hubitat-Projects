@@ -1,7 +1,7 @@
 {
 	"packageName": "Vacation Lighting Simulator",
 	"author": "Jed Brown",
-	"version": "0.2.4",
+	"version": "0.2.5",
 	"minimumHEVersion": "0.0",
 	"dateReleased": "2025-12-06",
 	"apps" : [
