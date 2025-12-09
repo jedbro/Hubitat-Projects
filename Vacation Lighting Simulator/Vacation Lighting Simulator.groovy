@@ -1,5 +1,7 @@
 /**
  *  Vacation Lighting Simulator
+ *  V0.2.6 - December 2025
+ *    - Fix handling of overnight time windows (e.g., Sunset +X → Sunrise +Y)
  *
  *  V0.2.5 - December 2025 Updated to:
  *    - Turn on a set of lights during active time, and turn them off at end of vacation time
@@ -43,7 +45,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.2.5 • Dec 2025"
+@Field static final String APP_VERSION = "v0.2.6 • Dec 2025"
 
 definition(
     name: "Vacation Lighting Simulator",
@@ -1159,18 +1161,46 @@ private getDaysOk() {
     result
 }
 
+/**
+ * Determine if the current time is within the configured window.
+ *
+ * Handles both "same-day" windows (e.g., 18:00 → 23:00)
+ * and "overnight" windows that cross midnight (e.g., Sunset+X → Sunrise+Y).
+ */
 private getTimeOk() {
-    def result = true
+    def tz    = getTimeZone()
     def start = timeWindowStart()
-    def stop = timeWindowStop(false, true)
-    if (start && stop && getTimeZone()) {
-        result = timeOfDayIsBetween(start, stop, new Date(), getTimeZone())
-    }
+    def stop  = timeWindowStop(false, true) // includes small end-time adjustment
     // Help debug any timing problems
-    logDebug "getTimeOk(): start=${start}, stop=${stop}, now=${new Date()}, tz=${getTimeZone()}"
-    
-    result
+    logDebug "For debuging timing issues: getTimeOk: start=${start}, stop=${stop}, now=${new Date()}, tz=${getTimeZone()}"
+
+    // If no window is configured (or we can't compute it), treat as "no restriction".
+    if (!start || !stop || !tz) {
+        return true
+    }
+
+    Date now = new Date()
+
+    // Normal same-day window: start < stop
+    if (start.before(stop)) {
+        return timeOfDayIsBetween(start, stop, now, tz)
+    }
+
+    // Degenerate case: start == stop → zero-length window, treat as closed
+    if (start.equals(stop)) {
+        return false
+    }
+
+    // Overnight window: start > stop (e.g., Sunset+X → Sunrise+Y).
+    // Interpret this as:
+    //   from start time in the evening, through midnight,
+    //   and up until stop time in the morning.
+    //
+    // Trick: the complement of the "forbidden" region (stop → start).
+    // If we're NOT between stop and start, then we ARE in the overnight window.
+    return !timeOfDayIsBetween(stop, start, now, tz)
 }
+
 
 // --- Sunrise / Sunset & time window helpers adapted for Hubitat ---
 
