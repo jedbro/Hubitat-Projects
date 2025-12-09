@@ -2,6 +2,8 @@
 	"packageName": "Vacation Lighting Simulator",
 	"author": "Jed Brown",
 	"version": "0.2.6",
+	"releaseNotes": "• Fixed overnight (Sunset → Sunrise) window bug\n• Improved time-window logic for cross-midnight ranges",
+	"minimumHEVersion": "0.0",
 	"minimumHEVersion": "0.0",
 	"dateReleased": "2025-12-06",
 	"apps" : [
