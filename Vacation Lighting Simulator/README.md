@@ -1,7 +1,7 @@
 # Vacation Lighting Simulator (Hubitat)
 
 **Vacation Lighting Simulator** is a smart and flexible occupancy-simulation app for **Hubitat Elevation**.  
-It helps your home look lived-in while you're away by turning lights on and off in a realistic, human-like pattern — using randomized cycles, anchor lights, time-window restrictions, and intelligent scheduling.
+The suite lets you run multiple independent lighting schedules plus an optional Analyzer child. Together they help your home look lived-in while you're away by turning lights on and off in a realistic, human-like pattern — using randomized cycles, anchor lights, time-window restrictions, and intelligent scheduling.
 
 This app is optimized specifically for Hubitat’s automations model, event-driven architecture, and lightweight Groovy runtime.  
 It is fast, dependable, and configurable for both simple and advanced use cases.
@@ -10,11 +10,17 @@ It is fast, dependable, and configurable for both simple and advanced use cases.
 
 ## ✨ Key Features
 
+### 🧩 Vacation Lighting Suite Architecture
+- Parent app manages multiple lighting-schedule children plus the Analyzer child from a single dashboard.
+- Each schedule child keeps its own triggers, devices, anchor lights, and summaries so you can model different rooms or time windows.
+- Analyzer child stays lightweight and on-demand—install it only if you want history charts.
+
 ### 🕒 Realistic Occupancy Simulation
 - Lights turn on randomly within your configured set.
 - Per-light on durations vary using **frequency ± ~20% jitter** (style B randomness).
 - Cycles run only within your allowed **time window** and **day-of-week** constraints.
 - Automatically stops when outside allowed modes or when vacation switch is turned off.
+- Manual override: turning the optional vacation switch ON bypasses the time window *and* the mode restriction so you can force a cycle early.
 
 ### 💡 Anchor Lights (Always-On During Session)
 Choose certain “anchor” lights that remain on whenever the app is active.  
@@ -54,6 +60,11 @@ This is helpful for verifying:
 - Anchor behavior  
 - Notification delivery  
 
+### 📊 Analyzer Child (History Timeline)
+- Optional child that lives under the Vacation Lighting Suite parent.  
+- Pick any date/time window and render a per-device timeline straight from Hubitat event history (1000-event cap, 24h lookback to catch anchor lights that were already on).  
+- Includes per-device stats and percentage-on calculations to validate that your vacation schedules behave the way you expect.
+
 ---
 
 # 📥 Installation
@@ -79,12 +90,14 @@ _Note:_ If you aren't finding it, try turning 'Fast Search' off in HPM.
 1. Open your Hubitat hub web UI  
 2. Navigate to **Apps Code**  
 3. Click **+ New App**  
-4. Paste in the contents of the `.groovy` file from GitHub:
+4. Add each of the following App Code files (parent first, then children):
 
-   ➡ **[https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy](https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy)**
+   - **Parent:** [Vacation Lighting Suite](https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Suite.groovy)
+   - **Schedule child:** [Vacation Lighting Simulator](https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy)
+   - **Analyzer child (optional):** [Vacation Lighting Analyzer](https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Analyzer.groovy)
 
-5. Save  
-6. Go to **Apps** → **Add User App** → select **Vacation Lighting Simulator**
+5. Save each file  
+6. Go to **Apps** → **Add User App** → select **Vacation Lighting Suite**, then create lighting schedule children (and the Analyzer child if desired) from within the parent UI
 
 ---
 
@@ -96,6 +109,7 @@ The app is organized into three pages:
 Where you configure:
 - **Modes** that allow vacation lighting  
 - **Optional vacation switch** (virtual or physical)  
+   - When turned ON it overrides both the configured time window and the mode restriction, letting you start cycles ahead of schedule.
 - **Time window** (specific times, sunrise/sunset ± offsets)  
 - **Lights to randomize**  
 - **Number of active lights per cycle**  
@@ -190,6 +204,12 @@ This typically means:
 ---
 
 # 🔄 Changelog
+
+## **v0.3.0 — December 2025**  
+✔ Introduced the **Vacation Lighting Suite** parent so you can run multiple lighting schedule children.  
+✔ Added the **Vacation Lighting Analyzer** child for on-demand history timelines and per-device stats.  
+✔ Vacation switch ON bypasses both the configured time window and the mode restriction for manual overrides.  
+✔ Existing schedule logic moved into the child app with no behavioral changes required.  
 
 ## **v0.2.4 — December 2025 (Initial Release)**  
 ✔ Per-light randomized durations (frequency ±20%)  

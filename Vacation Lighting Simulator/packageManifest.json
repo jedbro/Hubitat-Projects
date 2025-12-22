@@ -1,17 +1,36 @@
 {
 	"packageName": "Vacation Lighting Simulator",
 	"author": "Jed Brown",
-	"version": "0.2.6",
-	"releaseNotes": "• Fixed overnight (Sunset → Sunrise) window bug\n• Improved time-window logic for cross-midnight ranges",
+	"version": "0.3.0",
+	"releaseNotes": "• Converted to Vacation Lighting parent/child structure\n• Added Analyzer child for on-demand history timelines\n• Vacation switch ON bypasses both time window and mode restrictions",
 	"minimumHEVersion": "0.0",
-	"dateReleased": "2025-12-06",
+	"dateReleased": "2025-12-22",
 	"apps" : [
+		{
+			"id" : "d5245dfd-7b76-4f31-8f61-bdc3a8e07c55",
+			"name": "Vacation Lighting Simulator Suite",
+			"namespace": "Logicalnonsense",
+			"location": "https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Suite.groovy",
+			"required": true,
+			"primary": true,
+			"oauth": false
+		},
 		{
 			"id" : "550e8400-e29b-41d4-a716-446655440000",
 			"name": "Vacation Lighting Simulator",
-			"namespace": "logicalnonsense",
+			"namespace": "Logicalnonsense",
 			"location": "https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy",
-			"required": true,
+			"required": false,
+			"parent": "Logicalnonsense:Vacation Lighting Simulator Suite",
+			"oauth": false
+		},
+		{
+			"id" : "9b1c195c-0f20-4e5c-8d5b-3b2cf5d3b1d2",
+			"name": "Vacation Lighting Analyzer",
+			"namespace": "Logicalnonsense",
+			"location": "https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Analyzer.groovy",
+			"required": false,
+			"parent": "Logicalnonsense:Vacation Lighting Simulator Suite",
 			"oauth": false
 		}
 	]

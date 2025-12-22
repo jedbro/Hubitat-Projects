@@ -1,7 +1,11 @@
 /**
- *  Vacation Lighting Simulator
- *  V0.2.6 - December 2025
- *    - Fix handling of overnight time windows (e.g., Sunset +X → Sunrise +Y)
+ *  Vacation Lighting Simulator (Child)
+
+ *  V0.3.0 - December 2025
+ *    - Converted to parent/child architecture (managed by Vacation Lighting Suite)
+ *    - Child app retains randomized scheduling, summaries, and test cycle tools
+ *    - Vacation switch ON bypasses both the configured time window and mode restriction (manual override)
+ *    - New: Added a Analysis tool to aggregate lighting stats and a timeline chart for how the lights behaved over a period of time.
  *
  *  V0.2.5 - December 2025 Updated to:
  *    - Turn on a set of lights during active time, and turn them off at end of vacation time
@@ -45,7 +49,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.2.6 • Dec 2025"
+@Field static final String APP_VERSION = "v0.3.0 • Dec 2025"
 
 definition(
     name: "Vacation Lighting Simulator",
@@ -54,7 +58,8 @@ definition(
     category: "Safety & Security",
     description: "Simulate light and switch behaviors of an occupied home while you are away or on Vacation.",
     iconUrl: "",
-    iconX2Url: ""
+    iconX2Url: "",
+    parent: "Logicalnonsense:Vacation Lighting Simulator Suite"
 )
 
 preferences {
@@ -66,19 +71,28 @@ preferences {
 
 // --------- Logging helpers ---------
 
-private Boolean isLogEnabled() {
-    // default to true if user hasn't set it yet
-    return (logEnable != null ? logEnable : true)
+private Boolean isDescriptiveLoggingEnabled() {
+    return (descriptiveLogging != null ? descriptiveLogging : true)
+}
+
+private Boolean isDebugLoggingEnabled() {
+    return (debugLogging != null ? debugLogging : false)
+}
+
+private logInfo(msg) {
+    if (isDescriptiveLoggingEnabled()) {
+        log.info msg
+    }
 }
 
 private logDebug(msg) {
-    if (isLogEnabled()) {
+    if (isDebugLoggingEnabled()) {
         log.debug msg
     }
 }
 
 private logTrace(msg) {
-    if (isLogEnabled()) {
+    if (isDebugLoggingEnabled()) {
         log.trace msg
     }
 }
@@ -101,9 +115,22 @@ private getModeOk() {
  *  - If vacationSwitch configured: require switch ON, and also enforce modes if configured
  */
 private getArmOk() {
-    boolean byMode   = (!newMode || newMode.contains(location.mode))
-    boolean bySwitch = (!vacationSwitch || vacationSwitch.currentSwitch == "on")
-    return byMode && bySwitch
+    boolean modeAllowed = modeOk
+
+    if (!vacationSwitch) {
+        return modeAllowed
+    }
+
+    boolean switchIsOn = vacationSwitchOn()
+    if (switchIsOn) {
+        return true
+    }
+
+    return modeAllowed && switchIsOn
+}
+
+private boolean vacationSwitchOn() {
+    return vacationSwitch && (vacationSwitch.currentSwitch == "on")
 }
 
 // --------- Status helpers ---------
@@ -139,7 +166,7 @@ private String activeLightsWarning() {
 private String whyNotRunning() {
     def reasons = []
 
-    if (newMode && !modeOk) {
+    if (newMode && !modeOk && !vacationSwitchOn()) {
         reasons << "Mode '${location.mode}' is not in allowed modes ${newMode}"
     }
 
@@ -154,7 +181,7 @@ private String whyNotRunning() {
         reasons << "Today is not in allowed days ${days}"
     }
 
-    if (!timeOk && (startTimeType || endTimeType || starting || ending)) {
+    if (!timeOk && !vacationSwitchOn() && (startTimeType || endTimeType || starting || ending)) {
         def win = timeIntervalLabel()
         if (win) {
             reasons << "Current time is outside the configured window (${win})"
@@ -477,11 +504,16 @@ def Settings() {
             input daysInput
 
             paragraph "<b>Logging</b>"
-            input "logEnable", "bool",
-                title: "Enable debug logging?",
+            input "descriptiveLogging", "bool",
+                title: "Enable descriptive logging?",
                 defaultValue: true,
                 required: false,
-                description: "Optional. Turn off to reduce log noise once things are stable."
+                description: "Info-level status messages (recommended)."
+            input "debugLogging", "bool",
+                title: "Enable debug logging?",
+                defaultValue: false,
+                required: false,
+                description: "Includes debug + trace details for troubleshooting."
         }
     }
 }
@@ -588,13 +620,13 @@ def initialize() {
     if (armOk) {
         // Only set up time window + scheduling if we are currently armed
         schedStartEnd()
-        logDebug "Initialized while armed; scheduling checks. Settings: ${settings}"
+        logInfo "Initialized while armed; scheduling checks. Settings: ${settings}"
         setSched()
         scheduleSummary()
     } else {
         state.schedRunning = false
         state.startendRunning = false
-        logDebug "Initialized while NOT armed (mode='${location.mode}', vacationSwitch='${vacationSwitch ? vacationSwitch.currentSwitch : "n/a"}')."
+        logInfo "Initialized while NOT armed (mode='${location.mode}', vacationSwitch='${vacationSwitch ? vacationSwitch.currentSwitch : "n/a"}')."
     }
 }
 
@@ -719,10 +751,10 @@ def vacationSwitchHandler(evt) {
     logTrace "vacationSwitchHandler ${evt}, armOk=${armOk}"
 
     if (!armOk) {
-        logDebug "Vacation switch changed to ${evt.value}, armOk=false - clearing and unscheduling."
+        logInfo "Vacation switch changed to ${evt.value}, armOk=false - clearing and unscheduling."
         clearState(true)
     } else {
-        logDebug "Vacation switch changed to ${evt.value}, armOk=true - scheduling vacation lighting."
+        logInfo "Vacation switch changed to ${evt.value}, armOk=true - scheduling vacation lighting."
         state.schedRunning = false
         state.startendRunning = false
         schedStartEnd()
@@ -809,7 +841,7 @@ def getLastUpdSec() {
 // --------- MAIN LOGIC: cycles + queue ---------
 
 private getAllOk() {
-    armOk && daysOk && timeOk
+    armOk && daysOk && (timeOk || vacationSwitchOn())
 }
 
 /**
@@ -953,7 +985,7 @@ def scheduleCheck(evt) {
             clearState(true)
         }
 
-    } else if (armOk && daysOk && !timeOk) {
+    } else if (armOk && daysOk && !timeOk && !vacationSwitchOn()) {
         if ((state?.Running ?: false) || (state?.schedRunning ?: false)) {
             logDebug "scheduleCheck(): wrong time window - stopping Vacation Lights"
             clearState(true)
@@ -969,14 +1001,14 @@ def scheduleCheck(evt) {
 
 // --- Test cycle (one-off) ---
 def runTestCycle() {
-    logDebug "[TEST] Test cycle requested"
+    logInfo "[TEST] Test cycle requested"
 
     if (!switches || !switches.size()) {
-        logDebug "[TEST] No switches configured, aborting test."
+        logInfo "[TEST] No switches configured, aborting test."
         return
     }
 
-    logDebug "[TEST] Running one test cycle regardless of mode/time/day. " +
+    logInfo "[TEST] Running one test cycle regardless of mode/time/day. " +
              "Current mode='${location.mode}', vacationSwitch='${vacationSwitch ? vacationSwitch.currentSwitch : "n/a"}'."
 
     //
@@ -1435,7 +1467,7 @@ def greyedOut() {
 // sets complete/not complete for the settings section on the main dynamic page
 def greyedOutSettings() {
     def result = ""
-    if (days || falseAlarmThreshold || summaryDevice || summaryTime || logEnable != null) {
+    if (days || falseAlarmThreshold || summaryDevice || summaryTime || descriptiveLogging != null || debugLogging != null) {
         result = "complete"
     }
     result
