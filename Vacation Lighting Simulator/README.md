@@ -201,6 +201,24 @@ This typically means:
 - You are outside the time window  
 - Or the next `initCheck` has not yet been scheduled (new install/update)
 
+### 📉 Analyzer page won’t load / shows a 404
+This usually means the **Analyzer child app code isn’t installed** on the hub.
+
+If you installed via **HPM**:
+- HPM → **Modify** → select **Vacation Lighting Simulator**
+- Add/install **Vacation Lighting Analyzer** (child app)
+
+If you installed manually:
+- Install the **Vacation Lighting Analyzer** code under **Apps Code**
+
+### 📉 Analyzer is missing events in the selected range
+The Analyzer’s timeline is built from device event history queries capped at **1,000 events per device** (`eventsBetween(..., max: 1000)`).
+
+If a device generates more than 1,000 relevant events in your selected range, the result can be **truncated**, and the timeline/stats may look incomplete.
+Try:
+- Shortening the date range (e.g., analyze 1 day at a time)
+- Analyzing fewer devices at once
+
 ---
 
 # 🔄 Changelog

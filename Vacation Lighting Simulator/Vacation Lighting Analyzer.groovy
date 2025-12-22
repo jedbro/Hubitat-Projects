@@ -4,14 +4,15 @@
  *     a timeline chart and usage statistics to help users understand their vacation lighting patterns. The goal of this tool 
  *     is to help you refine your simulation settings for more realistic vacation lighting behavior.
  *  
- *  V0.3.0 - December 2025
+ *  V0.3.0.1 - December 2025
+ *    - 0.3.01. Small performance improvement
  *    - Child analyzer for the Vacation Lighting Suite parent
  *    - "Analyze History" timelines with a 24h lookback
  */
 
 import groovy.transform.Field
 
-@Field static final String APP_VERSION = "v0.3.0 • Dec 2025"
+@Field static final String APP_VERSION = "v0.3.0.1 • Dec 2025"
 @Field static final Long HISTORY_LOOKBACK_MS = 24L * 60L * 60L * 1000L
 
 definition(
@@ -175,12 +176,17 @@ private List buildSegmentsFromHistory(dev, Date start, Date end) {
     def events = dev.eventsBetween(queryStart, end, [max: 1000]) ?: []
     events = events.sort { it?.date?.time ?: 0L }
 
-    List inRangeEvents = []
     String currentState = null
+    Long lastChange = startMs
+    boolean sawInRangeStateEvent = false
+
+    List segments = []
 
     for (def evt : events) {
         Long ts = evt?.date?.time
         if (ts == null) { continue }
+        if (ts > endMs) { break }
+
         String st = eventToState(evt)
         if (!st) { continue }
 
@@ -189,32 +195,11 @@ private List buildSegmentsFromHistory(dev, Date start, Date end) {
             continue
         }
 
-        if (ts <= endMs) {
-            inRangeEvents << evt
-        } else {
-            break
+        sawInRangeStateEvent = true
+
+        if (!currentState) {
+            currentState = deviceStateSnapshot(dev) ?: "off"
         }
-    }
-
-    if (!currentState) {
-        currentState = deviceStateSnapshot(dev) ?: "off"
-    }
-
-    List segments = []
-    Long lastChange = startMs
-
-    if (inRangeEvents.isEmpty()) {
-        if (currentState == "on") {
-            segments << [start: startMs, end: endMs, state: "on"]
-        }
-        return segments
-    }
-
-    for (def evt : inRangeEvents) {
-        Long ts = evt?.date?.time
-        if (ts == null) { continue }
-        String newState = eventToState(evt)
-        if (!newState) { continue }
 
         Long segStart = Math.max(lastChange, startMs)
         Long segEnd = Math.min(ts, endMs)
@@ -222,8 +207,18 @@ private List buildSegmentsFromHistory(dev, Date start, Date end) {
             segments << [start: segStart, end: segEnd, state: currentState]
         }
 
-        currentState = newState
+        currentState = st
         lastChange = ts
+    }
+
+    if (!sawInRangeStateEvent) {
+        if (!currentState) {
+            currentState = deviceStateSnapshot(dev) ?: "off"
+        }
+        if (currentState == "on") {
+            segments << [start: startMs, end: endMs, state: "on"]
+        }
+        return segments
     }
 
     if (currentState && lastChange < endMs) {
