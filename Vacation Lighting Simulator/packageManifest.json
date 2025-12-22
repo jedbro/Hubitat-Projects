@@ -20,7 +20,7 @@
 			"name": "Vacation Lighting Simulator",
 			"namespace": "Logicalnonsense",
 			"location": "https://raw.githubusercontent.com/jedbro/Hubitat-Projects/refs/heads/main/Vacation%20Lighting%20Simulator/Vacation%20Lighting%20Simulator.groovy",
-			"required": false,
+			"required": true,
 			"parent": "Logicalnonsense:Vacation Lighting Simulator Suite",
 			"oauth": false
 		},
