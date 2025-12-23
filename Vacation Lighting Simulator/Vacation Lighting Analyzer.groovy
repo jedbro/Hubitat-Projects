@@ -4,15 +4,14 @@
  *     a timeline chart and usage statistics to help users understand their vacation lighting patterns. The goal of this tool 
  *     is to help you refine your simulation settings for more realistic vacation lighting behavior.
  *  
- *  V0.3.0.1 - December 2025
- *    - 0.3.01. Small performance improvement
- *    - Child analyzer for the Vacation Lighting Suite parent
- *    - "Analyze History" timelines with a 24h lookback
+ *  V0.3.1 - December 2025
+ *    - Analyzer improvements: more accurate segment merging, truncation warnings, simplified device picker,
+ *      and range guidance for best results
  */
 
 import groovy.transform.Field
 
-@Field static final String APP_VERSION = "v0.3.0.1 • Dec 2025"
+@Field static final String APP_VERSION = "v0.3.1 • Dec 2025"
 @Field static final Long HISTORY_LOOKBACK_MS = 24L * 60L * 60L * 1000L
 
 definition(
@@ -52,13 +51,16 @@ private String appVersion() { APP_VERSION }
 def mainPage() {
     dynamicPage(name: "mainPage", title: "Vacation Lighting Analyzer", install: true, uninstall: true) {
         section("") {
+            paragraph "💡 <b>Note:</b> This Analyzer is geared toward validating and visualizing <b>Vacation Lighting Simulator</b> runs so you can improve your simulation settings. While it can also be used to review real-life device history, given the nature of dimmers, on/off switches, and how Hubitat stores events, results may be wildly inaccurate."
+        }
+
+        section("") {
             paragraph "<div style='text-align:right;font-size:11px;color:#888;'>${appVersion()}</div>"
             paragraph "Select the devices you want to include in history analysis, then open the Analyze History tool."
         }
 
         section("Devices to analyze") {
-            input name: "trackedSwitches", type: "capability.switch", title: "Switches", multiple: true, required: true
-            input name: "trackedDimmers", type: "capability.switchLevel", title: "Dimmers (optional)", multiple: true, required: false
+            input name: "trackedDevices", type: "capability.switch", title: "Switches + dimmers", multiple: true, required: true
         }
 
         section("Tools") {
@@ -73,6 +75,10 @@ def mainPage() {
 
 def historyPage() {
     dynamicPage(name: "historyPage", title: "Analyze History (Date Range)") {
+        section("") {
+            paragraph "💡 <b>Note:</b> This Analyzer is geared toward validating and visualizing <b>Vacation Lighting Simulator</b> runs so you can improve your simulation settings. While it can also be used to review real-life device history, given the nature of dimmers, on/off switches, and how Hubitat stores events, results may be wildly inaccurate. If your results <i>seem inacurate for a device</i>, check that device's event history to confirm it contains the events you are expecting."
+        }
+
         section("Select date range") {
             paragraph "Pick both a calendar date and a clock time for the analysis window."
             input name: "historyStartDate", type: "date", title: "Start date", required: false
@@ -107,12 +113,12 @@ def historyPage() {
             }
 
             long rangeMs = (end.time as long) - (start.time as long)
-            long sevenDaysMs = 7L * 24L * 60L * 60L * 1000L
-            boolean rangeOverSevenDays = (rangeMs > sevenDaysMs)
+            long twentyFourHoursMs = 24L * 60L * 60L * 1000L
+            boolean rangeOverTwentyFourHours = (rangeMs > twentyFourHoursMs)
 
             section("Details") {
-                if (rangeOverSevenDays) {
-                    paragraph "<span style='color:#ff6666'><b>Warning:</b> Ranges longer than 7 days may be slow and may hit Hubitat's 1,000-event-per-device limit.</span>"
+                if (rangeOverTwentyFourHours) {
+                    paragraph "<span style='color:#ff6666'><b>Warning:</b> The Analyzer is geared toward ~1 day (or smaller) windows. Longer ranges may be wildely inacurate, slow, and may hit Hubitat's 1,000-event-per-device limit.</span>"
                 }
                 paragraph """
 <b>Start:</b> ${formatDateTime(start)}<br/>
@@ -123,30 +129,24 @@ def historyPage() {
 
             def devicesById = [:]
 
-            (settings.trackedSwitches ?: []).each { dev ->
+            List selectedDevices = (settings.trackedDevices ?: []) as List
+
+            // Backward compatibility: older installs used separate switch/dimmer lists.
+            if (!selectedDevices || selectedDevices.isEmpty()) {
+                selectedDevices = (((settings.trackedSwitches ?: []) + (settings.trackedDimmers ?: [])) as List)
+                    .findAll { it != null }
+                    .unique { it.id }
+            }
+
+            selectedDevices.each { dev ->
                 def result = buildSegmentsFromHistoryMeta(dev, start, end)
-                devicesById[dev.id.toString()] = [
+                String id = dev.id.toString()
+                devicesById[id] = [
                     name: dev.displayName,
                     labelHtml: buildDeviceLabelHtml(dev.displayName as String, result.truncated as boolean),
                     truncated: (result.truncated as boolean),
                     segments: (result.segments ?: [])
                 ]
-            }
-            (settings.trackedDimmers ?: []).each { dev ->
-                def result = buildSegmentsFromHistoryMeta(dev, start, end)
-                if (devicesById[dev.id.toString()]) {
-                    devicesById[dev.id.toString()].truncated = (devicesById[dev.id.toString()].truncated == true) || (result.truncated == true)
-                    devicesById[dev.id.toString()].labelHtml = buildDeviceLabelHtml(devicesById[dev.id.toString()].name as String, devicesById[dev.id.toString()].truncated as boolean)
-                    devicesById[dev.id.toString()].segments += (result.segments ?: [])
-                    devicesById[dev.id.toString()].segments = mergeSegments(devicesById[dev.id.toString()].segments)
-                } else {
-                    devicesById[dev.id.toString()] = [
-                        name: dev.displayName,
-                        labelHtml: buildDeviceLabelHtml(dev.displayName as String, result.truncated as boolean),
-                        truncated: (result.truncated as boolean),
-                        segments: (result.segments ?: [])
-                    ]
-                }
             }
 
             section("Per-device stats") {
@@ -154,7 +154,7 @@ def historyPage() {
                 paragraph table
             }
 
-            section("Timeline (from device history)") {
+            section("Approximated Timeline (from device history)") {
                 def html = renderTimeline(start.time as Long, end.time as Long, devicesById as Map)
                 paragraph html
             }

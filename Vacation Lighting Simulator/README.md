@@ -223,6 +223,10 @@ Try:
 
 # 🔄 Changelog
 
+## **v0.3.1 — December 2025**
+✔ Analyzer improvements: more reliable on/off totals for longer ranges, safer segment merging, and clearer truncation + range warnings.
+✔ Simplified Analyzer device selection into a single list (switches + dimmers).
+
 ## **v0.3.0 — December 2025**  
 ✔ Introduced the **Vacation Lighting Suite** parent so you can run multiple lighting schedule children.  
 ✔ Added the **Vacation Lighting Analyzer** child for on-demand history timelines and per-device stats.  

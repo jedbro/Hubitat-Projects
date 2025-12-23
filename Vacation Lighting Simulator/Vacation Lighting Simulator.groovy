@@ -1,7 +1,7 @@
 /**
  *  Vacation Lighting Simulator (Child)
 
- *  V0.3.0 - December 2025
+ *  V0.3.1 - December 2025
  *    - Converted to parent/child architecture (managed by Vacation Lighting Suite)
  *    - Child app retains randomized scheduling, summaries, and test cycle tools
  *    - Vacation switch ON bypasses both the configured time window and mode restriction (manual override)
@@ -49,7 +49,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.3.0 • Dec 2025"
+@Field static final String APP_VERSION = "v0.3.1 • Dec 2025"
 
 definition(
     name: "Vacation Lighting Simulator",

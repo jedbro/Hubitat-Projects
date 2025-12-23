@@ -1,8 +1,8 @@
 {
 	"packageName": "Vacation Lighting Simulator",
 	"author": "Jed Brown",
-	"version": "0.3.0",
-	"releaseNotes": "• Converted to Vacation Lighting parent/child structure\n• Added Analyzer child for on-demand history timelines\n• Vacation switch ON bypasses both time window and mode restrictions",
+	"version": "0.3.1",
+	"releaseNotes": "• Analyzer improvements (accuracy fixes, truncation warnings, simplified device picker)\n• Added range guidance for best results (day-or-smaller windows)\n• Minor performance improvements to history processing",
 	"minimumHEVersion": "0.0",
 	"dateReleased": "2025-12-22",
 	"apps" : [

@@ -1,12 +1,12 @@
 /**
  *  Vacation Lighting Simulator Suite (Parent)
- *  V0.3.0 - December 2025
+ *  V0.3.1 - December 2025
  *    - Introduces parent/child structure for multiple schedules plus analyzer child
  */
 
 import groovy.transform.Field
 
-@Field static final String APP_VERSION = "v0.3.0 • Dec 2025"
+@Field static final String APP_VERSION = "v0.3.1 • Dec 2025"
 
 definition(
     name: "Vacation Lighting Simulator Suite",
