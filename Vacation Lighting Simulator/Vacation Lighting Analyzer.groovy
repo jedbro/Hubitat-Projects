@@ -106,7 +106,14 @@ def historyPage() {
                 return
             }
 
+            long rangeMs = (end.time as long) - (start.time as long)
+            long sevenDaysMs = 7L * 24L * 60L * 60L * 1000L
+            boolean rangeOverSevenDays = (rangeMs > sevenDaysMs)
+
             section("Details") {
+                if (rangeOverSevenDays) {
+                    paragraph "<span style='color:#ff6666'><b>Warning:</b> Ranges longer than 7 days may be slow and may hit Hubitat's 1,000-event-per-device limit.</span>"
+                }
                 paragraph """
 <b>Start:</b> ${formatDateTime(start)}<br/>
 <b>End:</b> ${formatDateTime(end)}<br/>
@@ -117,21 +124,27 @@ def historyPage() {
             def devicesById = [:]
 
             (settings.trackedSwitches ?: []).each { dev ->
-                def segs = buildSegmentsFromHistory(dev, start, end)
+                def result = buildSegmentsFromHistoryMeta(dev, start, end)
                 devicesById[dev.id.toString()] = [
                     name: dev.displayName,
-                    segments: segs
+                    labelHtml: buildDeviceLabelHtml(dev.displayName as String, result.truncated as boolean),
+                    truncated: (result.truncated as boolean),
+                    segments: (result.segments ?: [])
                 ]
             }
             (settings.trackedDimmers ?: []).each { dev ->
-                def segs = buildSegmentsFromHistory(dev, start, end)
+                def result = buildSegmentsFromHistoryMeta(dev, start, end)
                 if (devicesById[dev.id.toString()]) {
-                    devicesById[dev.id.toString()].segments += segs
+                    devicesById[dev.id.toString()].truncated = (devicesById[dev.id.toString()].truncated == true) || (result.truncated == true)
+                    devicesById[dev.id.toString()].labelHtml = buildDeviceLabelHtml(devicesById[dev.id.toString()].name as String, devicesById[dev.id.toString()].truncated as boolean)
+                    devicesById[dev.id.toString()].segments += (result.segments ?: [])
                     devicesById[dev.id.toString()].segments = mergeSegments(devicesById[dev.id.toString()].segments)
                 } else {
                     devicesById[dev.id.toString()] = [
                         name: dev.displayName,
-                        segments: segs
+                        labelHtml: buildDeviceLabelHtml(dev.displayName as String, result.truncated as boolean),
+                        truncated: (result.truncated as boolean),
+                        segments: (result.segments ?: [])
                     ]
                 }
             }
@@ -163,17 +176,19 @@ def historyPage() {
 // History helpers
 // ========================================
 
-private List buildSegmentsFromHistory(dev, Date start, Date end) {
-    if (!dev || !start || !end) return []
+private Map buildSegmentsFromHistoryMeta(dev, Date start, Date end) {
+    if (!dev || !start || !end) return [segments: [], truncated: false]
 
     Long startMs = start.time
     Long endMs = end.time
-    if (endMs <= startMs) return []
+    if (endMs <= startMs) return [segments: [], truncated: false]
 
     Long lookbackStart = Math.max(startMs - HISTORY_LOOKBACK_MS, 0L)
     Date queryStart = new Date(lookbackStart)
 
     def events = dev.eventsBetween(queryStart, end, [max: 1000]) ?: []
+    boolean truncated = (events.size() >= 1000)
+
     events = events.sort { it?.date?.time ?: 0L }
 
     String currentState = null
@@ -198,7 +213,10 @@ private List buildSegmentsFromHistory(dev, Date start, Date end) {
         sawInRangeStateEvent = true
 
         if (!currentState) {
-            currentState = deviceStateSnapshot(dev) ?: "off"
+            // If we don't have a state event before the start of the window, we can't reliably know
+            // the historical state at start time. Using the current device state can wildly inflate
+            // historical on-time, so default to a conservative "off".
+            currentState = "off"
         }
 
         Long segStart = Math.max(lastChange, startMs)
@@ -213,23 +231,42 @@ private List buildSegmentsFromHistory(dev, Date start, Date end) {
 
     if (!sawInRangeStateEvent) {
         if (!currentState) {
-            currentState = deviceStateSnapshot(dev) ?: "off"
+            currentState = "off"
         }
         if (currentState == "on") {
             segments << [start: startMs, end: endMs, state: "on"]
         }
-        return segments
+        return [segments: segments, truncated: truncated]
     }
 
     if (currentState && lastChange < endMs) {
         segments << [start: Math.max(lastChange, startMs), end: endMs, state: currentState]
     }
 
-    return mergeSegments(segments)
+    return [segments: mergeSegments(segments), truncated: truncated]
+}
+
+private List buildSegmentsFromHistory(dev, Date start, Date end) {
+    return (buildSegmentsFromHistoryMeta(dev, start, end).segments ?: [])
+}
+
+private String buildDeviceLabelHtml(String deviceName, boolean truncated) {
+    String safeName = deviceName ?: "(unknown)"
+    if (truncated) {
+        return "${safeName} <span style='color:#ff6666'>(truncated)</span>"
+    }
+    return safeName
 }
 
 private List mergeSegments(List segments) {
     if (!segments || segments.size() < 2) return segments ?: []
+
+    segments = (segments ?: []).findAll { it?.start != null && it?.end != null && it?.state != null }
+        .sort { a, b ->
+            (a.start as Long) <=> (b.start as Long) ?: (a.end as Long) <=> (b.end as Long)
+        }
+
+    if (segments.size() < 2) return segments ?: []
 
     List merged = []
     def current = segments[0].clone()
@@ -259,7 +296,7 @@ private String eventToState(evt) {
     if (evt.name == "level") {
         try {
             Integer lvl = evt.value?.toInteger()
-            return (lvl > 0) ? "on" : "off"
+            return (lvl >= 5) ? "on" : "off"
         } catch (ignored) {
             return null
         }
@@ -279,7 +316,7 @@ private String deviceStateSnapshot(dev) {
     def levelVal = dev.currentValue("level")
     if (levelVal != null) {
         try {
-            return (levelVal.toInteger() > 0) ? "on" : "off"
+            return (levelVal.toInteger() >= 5) ? "on" : "off"
         } catch (ignored) {
             return null
         }
@@ -322,7 +359,7 @@ private String renderTimeline(Long startTs, Long endTs, Map devicesById) {
     devicesById.values().each { devEntry ->
         def segments = devEntry.segments ?: []
         sb << "<div class=\"timeline-row\">"
-        sb << "<div class=\"timeline-label\">${devEntry.name}</div>"
+        sb << "<div class=\"timeline-label\">${devEntry.labelHtml ?: devEntry.name}</div>"
         sb << "<div class=\"timeline-bar\">"
 
         segments.each { seg ->
@@ -370,7 +407,7 @@ private String buildDeviceStatsTable(Map devicesById, Long startTs, Long endTs) 
         int pct = totalMs > 0 ? Math.round((onMs * 100.0) / totalMs) as int : 0
 
         sb << "<tr style='border-bottom:1px solid #333;'>"
-        sb << "<td>${devEntry.name}</td>"
+        sb << "<td>${devEntry.labelHtml ?: devEntry.name}</td>"
         sb << "<td>${onCount}</td>"
         sb << "<td>${formatDuration(onMs)}</td>"
         sb << "<td>${pct}%</td>"
