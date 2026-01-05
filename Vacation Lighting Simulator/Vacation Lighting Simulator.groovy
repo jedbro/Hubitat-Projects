@@ -1,11 +1,12 @@
 /**
  *  Vacation Lighting Simulator (Child)
 
- *  V0.3.2 - January 2026
+ *  V0.3.2.1 - January 2026
  *    - Converted to parent/child architecture (managed by Vacation Lighting Suite)
  *    - Child app retains randomized scheduling, summaries, and test cycle tools
  *    - Vacation switch ON bypasses both the configured time window and mode restriction (manual override)
  *    - New: Added a Analysis tool to aggregate lighting stats and a timeline chart for how the lights behaved over a period of time.
+ *    - 0.3.2.1 small if check fix that prevents lights from staying on.
  *
  *  V0.2.5 - December 2025 Updated to:
  *    - Turn on a set of lights during active time, and turn them off at end of vacation time
@@ -651,7 +652,7 @@ def initialize() {
  * turnOff = true when we want a hard stop (wrong arm state, mode, etc.).
  */
 def clearState(turnOff = false, boolean unscheduleStartEnd = false) {
-    if (turnOff && (state?.Running ?: false)) {
+    if (turnOff) {
 
         // Turn off any lights we have queued
         def schedule = state.lightSchedule ?: [:]
