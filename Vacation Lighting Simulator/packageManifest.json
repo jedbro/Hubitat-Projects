@@ -1,10 +1,10 @@
 {
 	"packageName": "Vacation Lighting Simulator",
 	"author": "Jed Brown",
-	"version": "0.3.1",
-	"releaseNotes": "• Analyzer improvements (accuracy fixes, truncation warnings, simplified device picker)\n• Added range guidance for best results (day-or-smaller windows)\n• Minor performance improvements to history processing",
+	"version": "0.3.2",
+	"releaseNotes": "• Vacation reliability fixes: preserves next-day schedules after time window ends\n• Daily summary scheduling fix (no longer depends on being actively running/armed at send time)\n• Vacation switch arming fixed to true OR with allowed modes\n• Analyzer improvements (accuracy fixes, truncation warnings, simplified device picker)",
 	"minimumHEVersion": "0.0",
-	"dateReleased": "2025-12-22",
+	"dateReleased": "2026-01-05",
 	"apps" : [
 		{
 			"id" : "d5245dfd-7b76-4f31-8f61-bdc3a8e07c55",

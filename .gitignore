@@ -1,0 +1,8 @@
+# Local helper notes
+docs/agent-notes.md
+
+# macOS
+.DS_Store
+
+# Local Hubitat tooling
+.hubitat/

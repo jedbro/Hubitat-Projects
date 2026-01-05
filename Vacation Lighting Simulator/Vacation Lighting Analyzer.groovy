@@ -4,14 +4,14 @@
  *     a timeline chart and usage statistics to help users understand their vacation lighting patterns. The goal of this tool 
  *     is to help you refine your simulation settings for more realistic vacation lighting behavior.
  *  
- *  V0.3.1 - December 2025
+ *  V0.3.2 - January 2026
  *    - Analyzer improvements: more accurate segment merging, truncation warnings, simplified device picker,
  *      and range guidance for best results
  */
 
 import groovy.transform.Field
 
-@Field static final String APP_VERSION = "v0.3.1 • Dec 2025"
+@Field static final String APP_VERSION = "v0.3.2 • Jan 2026"
 @Field static final Long HISTORY_LOOKBACK_MS = 24L * 60L * 60L * 1000L
 
 definition(

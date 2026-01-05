@@ -1,7 +1,7 @@
 /**
  *  Vacation Lighting Simulator (Child)
 
- *  V0.3.1 - December 2025
+ *  V0.3.2 - January 2026
  *    - Converted to parent/child architecture (managed by Vacation Lighting Suite)
  *    - Child app retains randomized scheduling, summaries, and test cycle tools
  *    - Vacation switch ON bypasses both the configured time window and mode restriction (manual override)
@@ -49,7 +49,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.3.1 • Dec 2025"
+@Field static final String APP_VERSION = "v0.3.2 • Jan 2026"
 
 definition(
     name: "Vacation Lighting Simulator",
@@ -109,24 +109,34 @@ private getModeOk() {
     result
 }
 
+private boolean hasModeRestriction() {
+    // newMode is typically a List when multiple:true; treat empty as "no restriction configured"
+    if (newMode == null) return false
+    if (newMode instanceof List) return !newMode.isEmpty()
+    // Defensive: if Hubitat provides a scalar value
+    return true
+}
+
 /**
  * armOk:
  *  - If no vacationSwitch configured: rely on modes only
- *  - If vacationSwitch configured: require switch ON, and also enforce modes if configured
+ *  - If vacationSwitch configured: armed when (switch ON) OR (mode allowed)
  */
 private getArmOk() {
-    boolean modeAllowed = modeOk
+    boolean modesConfigured = hasModeRestriction()
+    boolean modeAllowed = modesConfigured ? (modeOk as boolean) : false
 
+    // No vacation switch: rely on modes only (if modes aren't configured, we are not armed)
     if (!vacationSwitch) {
         return modeAllowed
     }
 
     boolean switchIsOn = vacationSwitchOn()
-    if (switchIsOn) {
-        return true
-    }
 
-    return modeAllowed && switchIsOn
+    // Vacation switch configured:
+    // - If modes configured: armed when (switch ON) OR (mode allowed)
+    // - If modes NOT configured: armed only when switch is ON
+    return modesConfigured ? (switchIsOn || modeAllowed) : switchIsOn
 }
 
 private boolean vacationSwitchOn() {
@@ -170,10 +180,13 @@ private String whyNotRunning() {
         reasons << "Mode '${location.mode}' is not in allowed modes ${newMode}"
     }
 
-    if (vacationSwitch) {
+    // Vacation switch reasons depend on whether modes are configured.
+    if (vacationSwitch && !vacationSwitchOn()) {
         def sw = vacationSwitch.currentSwitch
-        if (sw != "on") {
-            reasons << "Vacation switch '${vacationSwitch.displayName}' is ${sw ?: 'unknown'} (must be ON)"
+        if (!hasModeRestriction()) {
+            reasons << "Vacation switch '${vacationSwitch.displayName}' is ${sw ?: 'unknown'}"
+        } else if (!modeOk) {
+            reasons << "Mode '${location.mode}' is not allowed and vacation switch '${vacationSwitch.displayName}' is ${sw ?: 'unknown'}"
         }
     }
 
@@ -354,7 +367,7 @@ def Setup() {
         title:        "Modes (e.g., Away/Vacation)",
         multiple:     true,
         required:     false,
-        description:  "Optional. If left blank, modes are ignored."
+        description:  "Optional. If left blank, Modes will not arm the app."
     ]
     def vacationSwitchInput = [
         name:         "vacationSwitch",
@@ -362,7 +375,7 @@ def Setup() {
         title:        "Vacation switch (optional – ON enables app)",
         required:     false,
         multiple:     false,
-        description:  "Optional. If set, this switch must be ON for the app to run."
+        description:  "Optional. If set, the app runs when this switch is ON OR when an allowed Mode is active. Switch ON also bypasses mode/time restrictions as a manual override."
     ]
     def switchesInput = [
         name:         "switches",
@@ -593,7 +606,7 @@ def updated() {
     def doTest = runTestNow
 
     unsubscribe()
-    clearState(true)
+    clearState(true, true)
     initialize()
 
     // Handle test AFTER normal initialization
@@ -607,22 +620,25 @@ def updated() {
 /**
  * initialize():
  * - Always subscribes to mode/vacationSwitch.
- * - Only schedules start/end + initCheck + summary if armOk is true.
+ * - Always schedules daily summary (if configured).
+ * - Only schedules start/end + initCheck if armOk is true.
  */
 def initialize() {
-    if (newMode != null) {
+    if (hasModeRestriction()) {
         subscribe(location, "mode", modeChangeHandler)
     }
     if (vacationSwitch) {
         subscribe(vacationSwitch, "switch", vacationSwitchHandler)
     }
 
+    // Always schedule the daily summary if configured (independent of armed state)
+    scheduleSummary()
+
     if (armOk) {
         // Only set up time window + scheduling if we are currently armed
         schedStartEnd()
         logInfo "Initialized while armed; scheduling checks. Settings: ${settings}"
         setSched()
-        scheduleSummary()
     } else {
         state.schedRunning = false
         state.startendRunning = false
@@ -634,7 +650,7 @@ def initialize() {
  * Clear state and optionally turn off managed lights.
  * turnOff = true when we want a hard stop (wrong arm state, mode, etc.).
  */
-def clearState(turnOff = false) {
+def clearState(turnOff = false, boolean unscheduleStartEnd = false) {
     if (turnOff && (state?.Running ?: false)) {
 
         // Turn off any lights we have queued
@@ -663,12 +679,20 @@ def clearState(turnOff = false) {
 
     state.Running = false
     state.schedRunning = false
-    state.startendRunning = false
     state.lastUpdDt = null
     state.nextCycleAtMs = null
 
-    // cancels all schedules, including summary; will be recreated when armOk becomes true again
-    unschedule()
+    // Always stop cycle engine timers
+    unschedule(initCheck)
+    unschedule(failsafe)
+    unschedule(offTick)
+
+    // Only remove daily start/end triggers when truly disarmed
+    if (unscheduleStartEnd) {
+        unschedule(startTimeCheck)
+        unschedule(endTimeCheck)
+        state.startendRunning = false
+    }
 }
 
 /**
@@ -684,9 +708,14 @@ def schedStartEnd() {
 
     state.startendRunning = false
 
+    def nowDt = new Date()
+
     if (starting != null || startTimeType != null) {
         def start = timeWindowStart(true)
         if (start) {
+            if (start.before(nowDt)) {
+                start = new Date(start.time + 24L * 60L * 60L * 1000L)
+            }
             runOnce(start, startTimeCheck)
             state.startendRunning = true
         }
@@ -694,6 +723,9 @@ def schedStartEnd() {
     if (ending != null || endTimeType != null) {
         def end = timeWindowStop(true)
         if (end) {
+            if (end.before(nowDt)) {
+                end = new Date(end.time + 24L * 60L * 60L * 1000L)
+            }
             runOnce(end, endTimeCheck)
             state.startendRunning = true
         }
@@ -736,7 +768,7 @@ def modeChangeHandler(evt) {
 
     if (!armOk) {
         logDebug "modeChangeHandler: armOk=false (mode='${location.mode}', switch='${vacationSwitch ? vacationSwitch.currentSwitch : "n/a"}') - clearing and unscheduling."
-        clearState(true)
+        clearState(true, true)
     } else {
         logDebug "modeChangeHandler: armOk=true - scheduling vacation lighting."
         state.schedRunning = false
@@ -752,7 +784,7 @@ def vacationSwitchHandler(evt) {
 
     if (!armOk) {
         logInfo "Vacation switch changed to ${evt.value}, armOk=false - clearing and unscheduling."
-        clearState(true)
+        clearState(true, true)
     } else {
         logInfo "Vacation switch changed to ${evt.value}, armOk=true - scheduling vacation lighting."
         state.schedRunning = false
@@ -777,10 +809,10 @@ def failsafe() {
  */
 def startTimeCheck() {
     logTrace "startTimeCheck"
-    if (armOk) {
+    if (armOk && daysOk) {
         setSched()
     } else {
-        logDebug "startTimeCheck(): armOk=false, not scheduling."
+        logDebug "startTimeCheck(): not scheduling (armOk=${armOk}, daysOk=${daysOk})."
     }
 }
 
@@ -796,7 +828,7 @@ def endTimeCheck() {
         scheduleCheck(null)
     } else {
         logDebug "endTimeCheck(): armOk=false, ensuring everything is cleared."
-        clearState(true)
+        clearState(true, true)
     }
 }
 
@@ -979,16 +1011,33 @@ def scheduleCheck(evt) {
 
         runIn(remaining, initCheck, [overwrite: true])
 
-    } else if (!armOk || !daysOk) {
+    } else if (!armOk) {
         if ((state?.Running ?: false) || (state?.schedRunning ?: false)) {
-            logDebug "scheduleCheck(): wrong arm state or day - stopping Vacation Lights"
-            clearState(true)
+            logDebug "scheduleCheck(): disarmed - stopping Vacation Lights"
+            clearState(true, true)
+        }
+
+    } else if (!daysOk) {
+        if ((state?.Running ?: false) || (state?.schedRunning ?: false)) {
+            logDebug "scheduleCheck(): wrong day - stopping Vacation Lights"
+            clearState(true, false)
         }
 
     } else if (armOk && daysOk && !timeOk && !vacationSwitchOn()) {
         if ((state?.Running ?: false) || (state?.schedRunning ?: false)) {
             logDebug "scheduleCheck(): wrong time window - stopping Vacation Lights"
-            clearState(true)
+            clearState(true, false)
+        }
+
+        // Keep daily summary scheduled even when outside the active window.
+        // Avoid churn by only re-scheduling if we don't believe one is pending.
+        if (summaryTime && (!state?.nextSummaryAtMs || (state.nextSummaryAtMs as Long) < now())) {
+            scheduleSummary()
+        }
+
+        // Self-heal: if start/end checks were somehow lost, recreate them
+        if (!(state.startendRunning ?: false)) {
+            schedStartEnd()
         }
     }
 
@@ -1338,6 +1387,7 @@ def scheduleSummary() {
 
     if (!summaryTime) {
         logDebug "No summaryTime configured, not scheduling daily summary"
+        state.nextSummaryAtMs = null
         return
     }
 
@@ -1351,6 +1401,7 @@ def scheduleSummary() {
     }
 
     logDebug "Scheduling daily summary for ${next}"
+    state.nextSummaryAtMs = next.time
     runOnce(next, dailySummary)
 }
 
@@ -1364,11 +1415,11 @@ def dailySummary() {
 
     String msg = buildSummaryMessage("daily", cycles, lightsOn, lightsOff, onNames, offNames)
 
-    if (summaryDevice && armOk) {
+    if (summaryDevice) {
         logDebug "Sending daily summary: ${msg}"
         summaryDevice*.deviceNotification(msg)
     } else {
-        logDebug "Daily summary (not sent): ${msg} (no summaryDevice or not armed)"
+        logDebug "Daily summary (not sent): ${msg} (no summaryDevice)"
     }
 
     // reset counters and name lists for the next day
@@ -1378,12 +1429,8 @@ def dailySummary() {
     state.summaryOnNames = []
     state.summaryOffNames= []
 
-    // schedule the next summary, but only if we are still armed
-    if (armOk) {
-        scheduleSummary()
-    } else {
-        logDebug "dailySummary(): not rescheduling because armOk=false"
-    }
+    // Always schedule the next summary if configured
+    scheduleSummary()
 }
 
 /**

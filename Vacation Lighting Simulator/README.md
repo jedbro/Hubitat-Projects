@@ -223,6 +223,14 @@ Try:
 
 # 🔄 Changelog
 
+## **v0.3.2 — January 2026**
+✔ Fix: simulation reliably restarts the next day (no longer unschedules future start/end triggers when the daily window ends).
+✔ Fix: daily summary notifications stay scheduled and send consistently.
+✔ Fix: vacation switch now properly acts as an OR override with allowed modes.
+✔ Fix: when a vacation switch is configured and Modes are blank, the app only arms when the switch is ON.
+✔ Efficiency: only subscribes to Mode changes when Modes are configured.
+✔ Scheduling: start-time trigger respects allowed days; lightweight self-heal helps keep daily summary/start-end checks scheduled.
+
 ## **v0.3.1 — December 2025**
 ✔ Analyzer improvements: more reliable on/off totals for longer ranges, safer segment merging, and clearer truncation + range warnings.
 ✔ Simplified Analyzer device selection into a single list (switches + dimmers).
