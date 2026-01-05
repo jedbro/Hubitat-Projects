@@ -223,6 +223,11 @@ Try:
 
 # 🔄 Changelog
 
+## **v0.3.2.2 — January 2026**
+✔ Fix: daily summary only schedules when the app is armed and if there were cycles (> 0) in the last 24 hours.
+✔ Fix: ensure lights turn off when app is disarmed.
+✔ Warning displayed if Hubitat timezone is not configured.
+
 ## **v0.3.2 — January 2026**
 ✔ Fix: simulation reliably restarts the next day (no longer unschedules future start/end triggers when the daily window ends).
 ✔ Fix: daily summary notifications stay scheduled and send consistently.

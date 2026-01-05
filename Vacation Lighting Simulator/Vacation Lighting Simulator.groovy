@@ -1,12 +1,16 @@
 /**
  *  Vacation Lighting Simulator (Child)
 
- *  V0.3.2.1 - January 2026
+ *  V0.3.2.2 - January 2026
+ *    - Small bug fix for daily summary (only sends if cycles > 0, only schedules when armed)
+ *    - Warning displayed if Hubitat timezone is not configured
+ *    - Small if check fix that prevents lights from staying on
+
+ *  V0.3.2 - January 2026
  *    - Converted to parent/child architecture (managed by Vacation Lighting Suite)
  *    - Child app retains randomized scheduling, summaries, and test cycle tools
  *    - Vacation switch ON bypasses both the configured time window and mode restriction (manual override)
  *    - New: Added a Analysis tool to aggregate lighting stats and a timeline chart for how the lights behaved over a period of time.
- *    - 0.3.2.1 small if check fix that prevents lights from staying on.
  *
  *  V0.2.5 - December 2025 Updated to:
  *    - Turn on a set of lights during active time, and turn them off at end of vacation time
@@ -50,7 +54,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.3.2 • Jan 2026"
+@Field static final String APP_VERSION = "v0.3.2.2 • Jan 2026"
 
 definition(
     name: "Vacation Lighting Simulator",
@@ -214,6 +218,11 @@ private String whyNotRunning() {
 private String appStatus() {
     def modeName = location?.mode ?: "Unknown"
     def configured = (switches && (newMode || vacationSwitch))
+
+    // Check for TimeZone issue
+    if (!location.timeZone) {
+        return "<b>⚠️ Warning:</b> Hub TimeZone is not set. Time windows cannot be calculated, so the app will run 24/7 when armed.<br>Please set your TimeZone in Hubitat Settings."
+    }
 
     // Counters
     def cycles   = state?.cycles   ?: 0
@@ -621,8 +630,7 @@ def updated() {
 /**
  * initialize():
  * - Always subscribes to mode/vacationSwitch.
- * - Always schedules daily summary (if configured).
- * - Only schedules start/end + initCheck if armOk is true.
+ * - Only schedules daily summary, start/end, and initCheck if armOk is true.
  */
 def initialize() {
     if (hasModeRestriction()) {
@@ -632,10 +640,9 @@ def initialize() {
         subscribe(vacationSwitch, "switch", vacationSwitchHandler)
     }
 
-    // Always schedule the daily summary if configured (independent of armed state)
-    scheduleSummary()
-
     if (armOk) {
+        // Schedule daily summary only when armed
+        scheduleSummary()
         // Only set up time window + scheduling if we are currently armed
         schedStartEnd()
         logInfo "Initialized while armed; scheduling checks. Settings: ${settings}"
@@ -1030,12 +1037,6 @@ def scheduleCheck(evt) {
             clearState(true, false)
         }
 
-        // Keep daily summary scheduled even when outside the active window.
-        // Avoid churn by only re-scheduling if we don't believe one is pending.
-        if (summaryTime && (!state?.nextSummaryAtMs || (state.nextSummaryAtMs as Long) < now())) {
-            scheduleSummary()
-        }
-
         // Self-heal: if start/end checks were somehow lost, recreate them
         if (!(state.startendRunning ?: false)) {
             schedStartEnd()
@@ -1414,24 +1415,31 @@ def dailySummary() {
     List onNames  = (state.summaryOnNames  ?: []) as List
     List offNames = (state.summaryOffNames ?: []) as List
 
-    String msg = buildSummaryMessage("daily", cycles, lightsOn, lightsOff, onNames, offNames)
-
-    if (summaryDevice) {
+    // Only send summary if there was actual activity (cycles > 0)
+    if (cycles > 0 && summaryDevice) {
+        String msg = buildSummaryMessage("daily", cycles, lightsOn, lightsOff, onNames, offNames)
         logDebug "Sending daily summary: ${msg}"
         summaryDevice*.deviceNotification(msg)
+    } else if (cycles == 0) {
+        logDebug "Daily summary skipped: no cycles ran in the last 24 hours"
     } else {
-        logDebug "Daily summary (not sent): ${msg} (no summaryDevice)"
+        logDebug "Daily summary skipped: no summaryDevice configured"
     }
 
-    // reset counters and name lists for the next day
+    // Reset counters and name lists for the next day
     state.cycles         = 0
     state.lightsOn       = 0
     state.lightsOff      = 0
     state.summaryOnNames = []
     state.summaryOffNames= []
 
-    // Always schedule the next summary if configured
-    scheduleSummary()
+    // Only reschedule if still armed; otherwise let arming trigger schedule it again
+    if (armOk) {
+        scheduleSummary()
+    } else {
+        state.nextSummaryAtMs = null
+        logDebug "Daily summary not rescheduled: app is not armed"
+    }
 }
 
 /**
