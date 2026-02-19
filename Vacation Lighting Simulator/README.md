@@ -223,6 +223,10 @@ Try:
 
 # 🔄 Changelog
 
+## **v0.3.3 — February 2026**
+✔ Fix to ensure schedule maintains over multiple days.
+✔ Option for notifications to be immediate after a session.
+
 ## **v0.3.2.2 — January 2026**
 ✔ Fix: daily summary only schedules when the app is armed and if there were cycles (> 0) in the last 24 hours.
 ✔ Fix: ensure lights turn off when app is disarmed.

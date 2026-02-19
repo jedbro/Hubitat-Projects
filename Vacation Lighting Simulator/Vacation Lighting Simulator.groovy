@@ -1,6 +1,10 @@
 /**
  *  Vacation Lighting Simulator (Child)
 
+ *  V0.3.3 - February 2026
+ *    - Fix to ensure schedule maintains over multiple days
+ *    - Option for notifications to be immediate after a session
+
  *  V0.3.2.2 - January 2026
  *    - Small bug fix for daily summary (only sends if cycles > 0, only schedules when armed)
  *    - Warning displayed if Hubitat timezone is not configured
@@ -54,7 +58,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.3.2.2 • Jan 2026"
+@Field static final String APP_VERSION = "v0.3.3 • Feb 2026"
 
 definition(
     name: "Vacation Lighting Simulator",
@@ -500,19 +504,28 @@ def Settings() {
             input falseAlarmThresholdInput
         }
 
-        // --- Daily summary ---
+        // --- Summary notifications ---
         section("") {
-            paragraph getFormat("header-blue", "Daily summary notifications")
-            paragraph "Get a once-per-day summary of how many cycles and light changes ran while the app was armed."
+            paragraph getFormat("header-blue", "Summary notifications")
+            paragraph "Get a summary of how many cycles and light changes ran."
             input "summaryDevice", "capability.notification",
-                title: "Notification devices for daily summary",
+                title: "Notification devices for summary",
                 required: false,
                 multiple: true,
-                description: "Optional. Select one or more devices to receive a daily summary."
-            input "summaryTime", "time",
-                title: "Time each day to send summary",
+                description: "Optional. Select one or more devices to receive summaries."
+            input "summaryMode", "enum",
+                title: "When to send summary",
+                options: ["daily": "Daily at specified time", "session": "After each session ends"],
+                defaultValue: "daily",
                 required: false,
-                description: "Optional. If not set, no daily summary will be sent."
+                submitOnChange: true,
+                description: "Daily: send at a fixed time each day. Session: send when time window closes, switch turns off, or mode changes."
+            if (summaryMode == null || summaryMode == "daily") {
+                input "summaryTime", "time",
+                    title: "Time each day to send summary",
+                    required: false,
+                    description: "Optional. If not set, no daily summary will be sent."
+            }
         }
 
         // --- Advanced header bar ---
@@ -776,6 +789,7 @@ def modeChangeHandler(evt) {
 
     if (!armOk) {
         logDebug "modeChangeHandler: armOk=false (mode='${location.mode}', switch='${vacationSwitch ? vacationSwitch.currentSwitch : "n/a"}') - clearing and unscheduling."
+        sendSessionSummary("mode changed to '${location.mode}'")
         clearState(true, true)
     } else {
         logDebug "modeChangeHandler: armOk=true - scheduling vacation lighting."
@@ -792,6 +806,7 @@ def vacationSwitchHandler(evt) {
 
     if (!armOk) {
         logInfo "Vacation switch changed to ${evt.value}, armOk=false - clearing and unscheduling."
+        sendSessionSummary("vacation switch turned off")
         clearState(true, true)
     } else {
         logInfo "Vacation switch changed to ${evt.value}, armOk=true - scheduling vacation lighting."
@@ -814,13 +829,22 @@ def failsafe() {
 /**
  * startTimeCheck():
  * - Only schedules next cycle if still armed.
+ * - Reschedules start/end triggers for the next day.
  */
 def startTimeCheck() {
     logTrace "startTimeCheck"
+    // Mark trigger as consumed so self-heal logic knows to reschedule
+    state.startendRunning = false
+
     if (armOk && daysOk) {
         setSched()
     } else {
         logDebug "startTimeCheck(): not scheduling (armOk=${armOk}, daysOk=${daysOk})."
+    }
+
+    // Reschedule start/end triggers for tomorrow while still armed
+    if (armOk) {
+        schedStartEnd()
     }
 }
 
@@ -828,12 +852,20 @@ def startTimeCheck() {
  * endTimeCheck():
  * - If still armed, lets scheduleCheck handle time window.
  * - If not armed, ensures everything is cleared.
+ * - Reschedules start/end triggers for the next day.
  */
 def endTimeCheck() {
     logTrace "endTimeCheck"
+    // Mark trigger as consumed so self-heal logic knows to reschedule
+    state.startendRunning = false
+
     if (armOk) {
+        // Send session summary before shutting down (if in session mode)
+        sendSessionSummary("time window ended")
         // Let scheduleCheck handle shutting things down due to time window
         scheduleCheck(null)
+        // Reschedule start/end triggers for tomorrow
+        schedStartEnd()
     } else {
         logDebug "endTimeCheck(): armOk=false, ensuring everything is cleared."
         clearState(true, true)
@@ -1387,6 +1419,13 @@ def scheduleSummary() {
     // cancel any existing dailySummary schedule only
     unschedule(dailySummary)
 
+    // Only schedule daily summaries if in daily mode (or not set, for backward compat)
+    if (summaryMode == "session") {
+        logDebug "Summary mode is 'session', not scheduling daily summary"
+        state.nextSummaryAtMs = null
+        return
+    }
+
     if (!summaryTime) {
         logDebug "No summaryTime configured, not scheduling daily summary"
         state.nextSummaryAtMs = null
@@ -1443,16 +1482,53 @@ def dailySummary() {
 }
 
 /**
- * Build a unified summary message for both daily and test summaries.
+ * Send a session summary if in session mode and there was activity.
+ * Called when session ends (time window closes, switch off, mode change).
+ */
+private void sendSessionSummary(String reason) {
+    // Only send if in session mode
+    if (summaryMode != "session") {
+        return
+    }
+
+    Integer cycles    = (state.cycles   ?: 0) as Integer
+    Integer lightsOn  = (state.lightsOn ?: 0) as Integer
+    Integer lightsOff = (state.lightsOff?: 0) as Integer
+
+    List onNames  = (state.summaryOnNames  ?: []) as List
+    List offNames = (state.summaryOffNames ?: []) as List
+
+    // Only send if there was activity
+    if (cycles > 0 && summaryDevice) {
+        String msg = buildSummaryMessage("session", cycles, lightsOn, lightsOff, onNames, offNames, reason)
+        logDebug "Sending session summary (${reason}): ${msg}"
+        summaryDevice*.deviceNotification(msg)
+    } else if (cycles == 0) {
+        logDebug "Session summary skipped (${reason}): no cycles ran this session"
+    } else {
+        logDebug "Session summary skipped (${reason}): no summaryDevice configured"
+    }
+
+    // Reset counters for next session
+    state.cycles         = 0
+    state.lightsOn       = 0
+    state.lightsOff      = 0
+    state.summaryOnNames = []
+    state.summaryOffNames= []
+}
+
+/**
+ * Build a unified summary message for daily, session, and test summaries.
  *
- * @param mode       "daily" or "test"
+ * @param mode       "daily", "session", or "test"
  * @param cycles     Number of cycles in this summary window
  * @param lightsOn   Number of lights turned on
  * @param lightsOff  Number of lights turned off
  * @param onNames    List of device names turned on during this window
  * @param offNames   List of device names turned off during this window
+ * @param reason     (session only) Why the session ended
  */
-private String buildSummaryMessage(String mode, Integer cycles, Integer lightsOn, Integer lightsOff, List onNames = null, List offNames = null) {
+private String buildSummaryMessage(String mode, Integer cycles, Integer lightsOn, Integer lightsOff, List onNames = null, List offNames = null, String reason = null) {
 
     cycles    = (cycles    ?: 0) as Integer
     lightsOn  = (lightsOn  ?: 0) as Integer
@@ -1485,6 +1561,23 @@ private String buildSummaryMessage(String mode, Integer cycles, Integer lightsOn
             return msg
         }
     }
+    // Session mode
+    if (mode == "session") {
+        String msg = "🌙 Vacation Lighting Session Complete:\n" +
+                     "• 🟢 ${cycles} cycle(s) simulated\n" +
+                     "• 💡 ${lightsOn} light(s) turned on\n" +
+                     "• 💤 ${lightsOff} light(s) turned off\n"
+
+        if (!onNames.isEmpty()) {
+            msg += "• 💡 Lights used: ${onNames.join(', ')}\n"
+        }
+
+        if (reason) {
+            msg += "\n🛑 Session ended: ${reason}"
+        }
+        return msg
+    }
+
     // Default to "daily" semantics
     if (cycles == 0 && onNames.isEmpty() && offNames.isEmpty()) {
         return "📊 Vacation Lighting Daily Summary:\n" +

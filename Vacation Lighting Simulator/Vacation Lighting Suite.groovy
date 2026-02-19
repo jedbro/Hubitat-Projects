@@ -1,12 +1,16 @@
 /**
  *  Vacation Lighting Simulator Suite (Parent)
+ *  V0.3.3 - February 2026
+ *    - Fix to ensure schedule maintains over multiple days
+ *    - Option for notifications to be immediate after a session
+ *
  *  V0.3.2.2 - January 2026
  *    - Introduces parent/child structure for multiple schedules plus analyzer child
  */
 
 import groovy.transform.Field
 
-@Field static final String APP_VERSION = "v0.3.2.2 • Jan 2026"
+@Field static final String APP_VERSION = "v0.3.3 • Feb 2026"
 
 definition(
     name: "Vacation Lighting Simulator Suite",
