@@ -94,10 +94,12 @@ async def _reader(ws) -> None:
         try:
             msg = json.loads(raw)
             event = msg.get("event")
-            logger.info(f"Art watcher: rx event={event} data={str(msg.get('data', ''))[:120]}")
+            logger.info(f"Art watcher: rx event={event} data={str(msg.get('data', ''))[:300]}")
             if event == "d2d_service_message":
                 inner = json.loads(msg.get("data", "{}"))
-                if inner.get("event") in ("artmode_status", "art_mode_changed"):
+                if inner.get("event") in (
+                    "artmode_status", "art_mode_changed", "get_artmode_status"
+                ):
                     status = inner.get("value") or inner.get("status")
                     if status in ("on", "off"):
                         _state["art_mode"] = status
