@@ -10,7 +10,10 @@ from typing import Optional
 
 import wakeonlan
 from samsungtvws import SamsungTVWS
-from samsungtvws.async_art import SamsungTVAsyncArt
+try:
+    from samsungtvws.async_art import SamsungTVAsyncArt
+except ImportError:
+    from samsungtvws import SamsungTVAsyncArt
 
 from config import tv_config, input_map
 
