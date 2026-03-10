@@ -1,0 +1,5 @@
+config.yml
+token.txt
+*.pyc
+__pycache__/
+venv/
