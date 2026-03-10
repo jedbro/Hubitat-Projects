@@ -58,19 +58,41 @@ def is_paired() -> bool:
 
 def pair() -> dict:
     """
-    Trigger a WebSocket connection to the TV which causes the pairing prompt
-    to appear on screen. Accept it on the TV — the token is then saved to
-    token.txt and reused for all future connections.
+    Trigger WebSocket connections to both the remote control channel and the
+    art channel. The TV will show an on-screen prompt for each — accept them,
+    then call this endpoint again to confirm. Tokens are saved to token_file.
     """
+    remote_ok = False
+    art_ok = False
+    errors = []
+
+    # 1. Remote control channel (KEY_LEFT is harmless)
     try:
-        tv = _make_tv()
-        # send_key opens the WebSocket connection which triggers the pairing
-        # prompt and saves the auth token to token_file on success.
-        tv.send_key("KEY_LEFT")
-        return {"status": "paired", "paired": True}
+        t = _make_tv()
+        t.send_key("KEY_LEFT")
+        remote_ok = True
     except Exception as e:
-        return {"status": "waiting_for_approval", "paired": False, "detail": str(e),
-                "hint": "If the TV showed a pairing prompt, accept it and call /api/tv/pair again."}
+        errors.append(f"remote: {e}")
+
+    # 2. Art channel — needs separate acceptance on the TV
+    try:
+        a = _make_art()
+        a.get_artmode()
+        art_ok = True
+    except Exception as e:
+        errors.append(f"art: {e}")
+
+    if remote_ok and art_ok:
+        return {"status": "paired", "paired": True, "remote": True, "art": True}
+
+    return {
+        "status": "waiting_for_approval",
+        "paired": False,
+        "remote": remote_ok,
+        "art": art_ok,
+        "errors": errors,
+        "hint": "Accept any prompts shown on the TV, then call /api/tv/pair again.",
+    }
 
 
 # ---------------------------------------------------------------------------
