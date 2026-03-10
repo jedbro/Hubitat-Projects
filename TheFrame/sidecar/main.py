@@ -3,6 +3,9 @@ TheFrame Sidecar — FastAPI service for Samsung Frame TV control.
 Exposes a simple REST API consumed by the Hubitat driver.
 """
 import logging
+import platform
+import sys
+import time
 from typing import Optional
 
 import httpx
@@ -10,7 +13,10 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 import tv
-from config import load_config, server_config
+from config import load_config, server_config, tv_config, input_map
+
+SIDECAR_VERSION = "1.1.0"
+_start_time = time.time()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -144,12 +150,56 @@ def set_slideshow(body: SlideshowRequest):
 
 
 # ---------------------------------------------------------------------------
-# Health check
+# Health & diagnostics
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    paired = tv.is_paired()
+    reachable = tv.is_reachable()
+    return {
+        "status": "ok",
+        "version": SIDECAR_VERSION,
+        "paired": paired,
+        "tvReachable": reachable,
+    }
+
+
+@app.get("/debug")
+def debug():
+    """Full diagnostic snapshot — useful for troubleshooting."""
+    cfg = tv_config()
+    paired = tv.is_paired()
+    reachable = tv.is_reachable()
+    uptime_seconds = int(time.time() - _start_time)
+
+    # Attempt live state only if TV is reachable
+    live_state = None
+    if reachable:
+        try:
+            live_state = tv.get_state()
+        except Exception as e:
+            live_state = {"error": str(e)}
+
+    return {
+        "sidecar": {
+            "version": SIDECAR_VERSION,
+            "uptimeSeconds": uptime_seconds,
+            "pythonVersion": sys.version,
+            "platform": platform.platform(),
+        },
+        "config": {
+            "tvHost": cfg.get("host"),
+            "tvPort": cfg.get("port", 8002),
+            "macConfigured": bool(cfg.get("mac")),
+            "inputsConfigured": list(input_map().keys()),
+        },
+        "connectivity": {
+            "tvReachable": reachable,
+            "paired": paired,
+        },
+        "liveState": live_state,
+    }
 
 
 # ---------------------------------------------------------------------------
