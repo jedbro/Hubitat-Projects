@@ -11,10 +11,34 @@ import httpx
 import wakeonlan
 from samsungtvws import SamsungTVWS, SamsungTVArt
 from samsungtvws import exceptions as tv_exceptions
+from samsungtvws.connection import SamsungTVWSConnection
+from samsungtvws.event import MS_CHANNEL_CLIENT_CONNECT_EVENT, MS_CHANNEL_READY_EVENT
 
 from config import tv_config, input_map
 
 logger = logging.getLogger(__name__)
+
+
+class _FrameTVArt(SamsungTVArt):
+    """
+    Subclass that tolerates ms.channel.clientConnect notifications arriving
+    before ms.channel.ready during the art-channel handshake.
+    Some Frame TV firmware versions send clientConnect first; the stock
+    SamsungTVArt.open() fails immediately on any non-ready event.
+    """
+    def open(self):
+        # Let the grandparent handle the initial ms.channel.connect handshake.
+        SamsungTVWSConnection.open(self)
+        # Drain any clientConnect notifications and wait for ready.
+        while True:
+            event, frame = self._recv_frame()
+            if event == MS_CHANNEL_READY_EVENT:
+                return self.connection
+            elif event == MS_CHANNEL_CLIENT_CONNECT_EVENT:
+                continue
+            else:
+                self.close()
+                raise tv_exceptions.ConnectionFailure(frame)
 
 
 def _token_file_path() -> str:
@@ -34,11 +58,11 @@ def _make_tv() -> SamsungTVWS:
     )
 
 
-def _make_art() -> SamsungTVArt:
+def _make_art() -> _FrameTVArt:
     cfg = tv_config()
     # SamsungTVArt v3.x uses port 8001 (REST) to bootstrap the D2D connection.
     # Do NOT pass the WebSocket port (8002) here.
-    return SamsungTVArt(
+    return _FrameTVArt(
         host=cfg["host"],
         token_file=_token_file_path(),
     )
