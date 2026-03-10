@@ -4,9 +4,11 @@ import groovy.transform.Field
  * Samsung Frame TV Driver
  * Talks to the TheFrame sidecar service running on a local server (e.g. Raspberry Pi).
  *
- * Version: 1.1.0
+ * Version: 1.2.0
  *
  * Changelog:
+ *   1.2.0 - Free-form poll interval (1–999 min), add currentApp attribute,
+ *            remove unsupported art content commands (list/select/upload/slideshow)
  *   1.1.0 - Add paired attribute + pair() command, currentInput from state,
  *            artMode defaults to 'unknown' when unpaired
  *   1.0.0 - Initial release: power, inputs, art mode, art selection, slideshow
@@ -15,7 +17,6 @@ import groovy.transform.Field
  *   - Switch (on/off)
  *   - Art Mode on/off
  *   - Input switching (Apple TV, HDMI, etc.)
- *   - Art selection and slideshow control
  *   - isWatching detection (safe for night-time automations)
  *   - Paired status + one-click pairing
  *
@@ -34,28 +35,18 @@ metadata {
         capability "Sensor"
 
         attribute "driverVersion", "string"
-        attribute "paired",       "enum", ["true", "false"]
-        attribute "artMode",      "enum", ["on", "off", "unknown"]
-        attribute "isWatching",   "enum", ["true", "false"]
-        attribute "currentInput", "string"
-        attribute "currentArtId", "string"
-        attribute "artList",      "string"   // JSON array of available art IDs
-        attribute "lastUpdated",  "string"
+        attribute "paired",        "enum", ["true", "false"]
+        attribute "artMode",       "enum", ["on", "off", "unknown"]
+        attribute "isWatching",    "enum", ["true", "false"]
+        attribute "currentInput",  "string"
+        attribute "currentApp",    "string"
+        attribute "lastUpdated",   "string"
 
         command "pair"
         command "artModeOn"
         command "artModeOff"
         command "setInput", [[name: "Input Name*", type: "STRING",
                               description: "Configured input name (e.g. appletv, hdmi2)"]]
-        command "selectArt", [[name: "Content ID*", type: "STRING",
-                               description: "Art content ID from listArt"]]
-        command "nextArt"
-        command "listArt"
-        command "slideshowOn",  [[name: "Interval (minutes)", type: "NUMBER",
-                                  description: "Minutes between art changes (default 30)"]]
-        command "slideshowOff"
-        command "uploadArtUrl", [[name: "Image URL*", type: "STRING",
-                                  description: "URL of image to upload to TV art collection"]]
     }
 
     preferences {
@@ -63,9 +54,9 @@ metadata {
               description: "IP or hostname of the Raspberry Pi", required: true
         input name: "sidecarPort", type: "number", title: "Sidecar Port",
               defaultValue: 8088, required: true
-        input name: "pollInterval", type: "enum",  title: "Poll Interval",
-              options: ["Disabled", "1 minute", "2 minutes", "5 minutes", "10 minutes"],
-              defaultValue: "5 minutes"
+        input name: "pollInterval", type: "number",
+              title: "Poll Interval (minutes, 1–999; leave blank to disable)",
+              defaultValue: 5, range: "1..999", required: false
         input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
     }
 }
@@ -74,7 +65,7 @@ metadata {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-@Field static final String DRIVER_VERSION = "1.1.0"
+@Field static final String DRIVER_VERSION = "1.2.0"
 
 def installed() {
     log.info "Samsung Frame TV driver installed (v${DRIVER_VERSION})"
@@ -90,13 +81,20 @@ def updated() {
 
 def initialize() {
     unschedule()
-    switch (pollInterval) {
-        case "1 minute":  runEvery1Minute("refresh");  break
-        case "2 minutes": schedule("0 */2 * * * ?", "refresh"); break
-        case "5 minutes": runEvery5Minutes("refresh"); break
-        case "10 minutes": runEvery10Minutes("refresh"); break
-    }
     refresh()
+    scheduleNextPoll()
+}
+
+private void scheduleNextPoll() {
+    def interval = (pollInterval as Integer) ?: 0
+    if (interval > 0) {
+        runIn(interval * 60, "scheduledRefresh")
+    }
+}
+
+def scheduledRefresh() {
+    refresh()
+    scheduleNextPoll()
 }
 
 // ---------------------------------------------------------------------------
@@ -113,8 +111,8 @@ def on() {
 def off() {
     logDebug "off()"
     apiPost("/api/tv/power/off")
-    sendEvent(name: "switch", value: "off")
-    sendEvent(name: "artMode", value: "off")
+    sendEvent(name: "switch",     value: "off")
+    sendEvent(name: "artMode",    value: "off")
     sendEvent(name: "isWatching", value: "false")
 }
 
@@ -136,20 +134,23 @@ def refresh() {
     def isWatching    = resp.isWatching ? "true" : "false"
     def currentSource = resp.currentSource ?: ""
 
-    sendEvent(name: "switch",        value: power == "on" ? "on" : "off")
-    sendEvent(name: "paired",        value: paired)
-    sendEvent(name: "artMode",       value: artMode)
-    sendEvent(name: "isWatching",    value: isWatching)
-    sendEvent(name: "lastUpdated",   value: new Date().toString())
+    sendEvent(name: "switch",      value: power == "on" ? "on" : "off")
+    sendEvent(name: "paired",      value: paired)
+    sendEvent(name: "artMode",     value: artMode)
+    sendEvent(name: "isWatching",  value: isWatching)
+    sendEvent(name: "lastUpdated", value: new Date().toString())
     if (currentSource) {
         sendEvent(name: "currentInput", value: currentSource)
+    }
+    if (resp.currentApp != null) {
+        sendEvent(name: "currentApp", value: resp.currentApp ?: "")
     }
 
     if (paired == "false") {
         log.warn "Samsung Frame TV: not paired — run 'curl -X POST http://${sidecarHost}:${sidecarPort}/api/tv/pair' on the Pi to pair"
     }
 
-    logDebug "State: power=${power}, paired=${paired}, artMode=${artMode}, isWatching=${isWatching}, source=${currentSource}"
+    logDebug "State: power=${power}, paired=${paired}, artMode=${artMode}, isWatching=${isWatching}, source=${currentSource}, app=${resp.currentApp}"
 }
 
 // ---------------------------------------------------------------------------
@@ -194,57 +195,6 @@ def setInput(String inputName) {
     logDebug "setInput(${inputName})"
     apiPost("/api/tv/input/${inputName}")
     sendEvent(name: "currentInput", value: inputName)
-}
-
-// ---------------------------------------------------------------------------
-// Art management
-// ---------------------------------------------------------------------------
-
-def listArt() {
-    logDebug "listArt()"
-    def resp = apiGet("/api/art/list")
-    if (resp?.items) {
-        def ids = resp.items.collect { it.content_id ?: it }.join(", ")
-        sendEvent(name: "artList", value: groovy.json.JsonOutput.toJson(resp.items))
-        log.info "Available art IDs: ${ids}"
-    }
-}
-
-def selectArt(String contentId) {
-    logDebug "selectArt(${contentId})"
-    apiPost("/api/art/select", [contentId: contentId])
-    sendEvent(name: "currentArtId", value: contentId)
-}
-
-def nextArt() {
-    logDebug "nextArt()"
-    // Get list, find current, advance to next
-    def listResp    = apiGet("/api/art/list")
-    def currentResp = apiGet("/api/art/current")
-    if (!listResp?.items || !currentResp) return
-
-    def items     = listResp.items
-    def currentId = currentResp.content_id
-    def idx       = items.findIndexOf { (it.content_id ?: it) == currentId }
-    def nextIdx   = (idx + 1) % items.size()
-    def nextId    = items[nextIdx].content_id ?: items[nextIdx]
-
-    selectArt(nextId as String)
-}
-
-def slideshowOn(Number intervalMinutes = 30) {
-    logDebug "slideshowOn(${intervalMinutes}m)"
-    apiPost("/api/art/slideshow", [enabled: true, intervalSeconds: (intervalMinutes * 60).toInteger()])
-}
-
-def slideshowOff() {
-    logDebug "slideshowOff()"
-    apiPost("/api/art/slideshow", [enabled: false])
-}
-
-def uploadArtUrl(String url) {
-    logDebug "uploadArtUrl(${url})"
-    apiPost("/api/art/upload/url", [url: url])
 }
 
 // ---------------------------------------------------------------------------
