@@ -31,6 +31,7 @@ metadata {
         attribute "artList",      "string"   // JSON array of available art IDs
         attribute "lastUpdated",  "string"
 
+        command "pair"
         command "artModeOn"
         command "artModeOff"
         command "setInput", [[name: "Input Name*", type: "STRING",
@@ -134,6 +135,22 @@ def refresh() {
     }
 
     logDebug "State: power=${power}, paired=${paired}, artMode=${artMode}, isWatching=${isWatching}, source=${currentSource}"
+}
+
+// ---------------------------------------------------------------------------
+// Pairing
+// ---------------------------------------------------------------------------
+
+def pair() {
+    logDebug "pair()"
+    def resp = apiPost("/api/tv/pair")
+    if (resp?.paired) {
+        log.info "Samsung Frame TV: paired successfully"
+        sendEvent(name: "paired", value: "true")
+    } else {
+        log.warn "Samsung Frame TV: pairing pending — accept the prompt on the TV, then click Pair again"
+        sendEvent(name: "paired", value: "false")
+    }
 }
 
 // ---------------------------------------------------------------------------
