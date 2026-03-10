@@ -46,6 +46,15 @@ def _make_art() -> SamsungTVArt:
 # Pairing
 # ---------------------------------------------------------------------------
 
+def is_paired() -> bool:
+    """Returns True if a valid pairing token has been saved."""
+    path = _token_file_path()
+    try:
+        return os.path.exists(path) and os.path.getsize(path) > 0
+    except OSError:
+        return False
+
+
 def pair() -> dict:
     """
     Trigger a WebSocket connection to the TV which causes the pairing prompt
@@ -55,9 +64,9 @@ def pair() -> dict:
     try:
         tv = _make_tv()
         info = tv.rest_device_info()
-        return {"status": "paired", "deviceInfo": info}
+        return {"status": "paired", "paired": True, "deviceInfo": info}
     except Exception as e:
-        return {"status": "waiting_for_approval", "detail": str(e),
+        return {"status": "waiting_for_approval", "paired": False, "detail": str(e),
                 "hint": "If the TV showed a pairing prompt, accept it and call /api/tv/pair again."}
 
 
@@ -159,6 +168,7 @@ def get_current_source() -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def get_state() -> dict:
+    paired = is_paired()
     power = is_reachable()
     art_mode = None
     is_watching = False
@@ -176,6 +186,7 @@ def get_state() -> dict:
 
     return {
         "power": "on" if power else "off",
+        "paired": paired,
         "artMode": art_mode if art_mode else "unknown",
         "isWatching": is_watching,
         "currentSource": current_source,

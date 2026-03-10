@@ -23,6 +23,7 @@ metadata {
         capability "Actuator"
         capability "Sensor"
 
+        attribute "paired",       "enum", ["true", "false"]
         attribute "artMode",      "enum", ["on", "off", "unknown"]
         attribute "isWatching",   "enum", ["true", "false"]
         attribute "currentInput", "string"
@@ -114,11 +115,13 @@ def refresh() {
     }
 
     def power         = resp.power ?: "off"
-    def artMode       = resp.artMode ?: "off"
+    def paired        = resp.paired ? "true" : "false"
+    def artMode       = resp.artMode ?: "unknown"
     def isWatching    = resp.isWatching ? "true" : "false"
     def currentSource = resp.currentSource ?: ""
 
     sendEvent(name: "switch",        value: power == "on" ? "on" : "off")
+    sendEvent(name: "paired",        value: paired)
     sendEvent(name: "artMode",       value: artMode)
     sendEvent(name: "isWatching",    value: isWatching)
     sendEvent(name: "lastUpdated",   value: new Date().toString())
@@ -126,7 +129,11 @@ def refresh() {
         sendEvent(name: "currentInput", value: currentSource)
     }
 
-    logDebug "State: power=${power}, artMode=${artMode}, isWatching=${isWatching}, source=${currentSource}"
+    if (paired == "false") {
+        log.warn "Samsung Frame TV: not paired — run 'curl -X POST http://${sidecarHost}:${sidecarPort}/api/tv/pair' on the Pi to pair"
+    }
+
+    logDebug "State: power=${power}, paired=${paired}, artMode=${artMode}, isWatching=${isWatching}, source=${currentSource}"
 }
 
 // ---------------------------------------------------------------------------
