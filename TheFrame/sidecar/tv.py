@@ -21,24 +21,20 @@ logger = logging.getLogger(__name__)
 
 class _FrameTVArt(SamsungTVArt):
     """
-    Subclass that tolerates ms.channel.clientConnect notifications arriving
-    before ms.channel.ready during the art-channel handshake.
-    Some Frame TV firmware versions send clientConnect first; the stock
-    SamsungTVArt.open() fails immediately on any non-ready event.
+    Subclass that handles firmware versions that send ms.channel.clientConnect
+    instead of (or before) ms.channel.ready during the art-channel handshake.
+    The QN55LS03BAFXZA (2022 Frame) never sends ms.channel.ready — treating
+    clientConnect as the ready signal unblocks all art operations.
     """
     def open(self):
         # Let the grandparent handle the initial ms.channel.connect handshake.
         SamsungTVWSConnection.open(self)
-        # Drain any clientConnect notifications and wait for ready.
-        while True:
-            event, frame = self._recv_frame()
-            if event == MS_CHANNEL_READY_EVENT:
-                return self.connection
-            elif event == MS_CHANNEL_CLIENT_CONNECT_EVENT:
-                continue
-            else:
-                self.close()
-                raise tv_exceptions.ConnectionFailure(frame)
+        # Read the next frame: accept either ready or clientConnect as success.
+        event, frame = self._recv_frame()
+        if event in (MS_CHANNEL_READY_EVENT, MS_CHANNEL_CLIENT_CONNECT_EVENT):
+            return self.connection
+        self.close()
+        raise tv_exceptions.ConnectionFailure(frame)
 
 
 def _token_file_path() -> str:
