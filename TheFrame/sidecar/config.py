@@ -23,3 +23,7 @@ def input_map():
 
 def server_config():
     return get_config().get("server", {"host": "0.0.0.0", "port": 8088})
+
+def st_config():
+    """Returns SmartThings config dict, or None if not configured."""
+    return get_config().get("smartthings")

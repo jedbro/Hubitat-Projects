@@ -155,11 +155,13 @@ def get_current_source() -> Optional[str]:
 
 def get_state() -> dict:
     import art_watcher
+    import st_poller
     paired = is_paired()
     power = is_reachable()
     art_mode = None
     is_watching = False
     current_source = None
+    current_app = None
 
     if power:
         art_mode = art_watcher.get_art_mode()
@@ -169,12 +171,19 @@ def get_state() -> dict:
             is_watching = art_mode == "off"
         current_source = get_current_source()
 
+        st = st_poller.get()
+        if st:
+            current_app = st.get("currentApp")
+            if not current_source:
+                current_source = st.get("inputSource")
+
     return {
         "power": "on" if power else "off",
         "paired": paired,
         "artMode": art_mode if art_mode is not None else "unknown",
         "isWatching": is_watching,
         "currentSource": current_source,
+        "currentApp": current_app,
     }
 
 

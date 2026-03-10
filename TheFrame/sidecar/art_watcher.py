@@ -104,6 +104,11 @@ async def _reader(ws) -> None:
                     if status in ("on", "off"):
                         _state["art_mode"] = status
                         logger.info(f"Art watcher: artMode → {status}")
+                        try:
+                            import st_poller
+                            st_poller.invalidate()
+                        except Exception:
+                            pass
         except Exception as e:
             logger.info(f"Art watcher: parse error: {e}")
 

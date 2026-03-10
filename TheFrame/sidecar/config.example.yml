@@ -17,3 +17,11 @@ inputs:
 server:
   host: "0.0.0.0"
   port: 8088
+
+# Optional: SmartThings integration for current app / input source
+# Get a token at https://account.smartthings.com/tokens (needs Devices read scope)
+# Find your device ID: curl -H "Authorization: Bearer TOKEN" https://api.smartthings.com/v1/devices
+#smartthings:
+#  token: "your-personal-access-token"
+#  device_id: "your-device-uuid"
+#  cache_ttl: 60   # seconds — how long to cache ST data between refreshes
