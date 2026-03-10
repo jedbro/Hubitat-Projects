@@ -37,6 +37,19 @@ class UploadUrlRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Pairing
+# ---------------------------------------------------------------------------
+
+@app.post("/api/tv/pair")
+def pair():
+    """
+    Initiate TV pairing. The TV will show an on-screen prompt — accept it,
+    then call this endpoint again to confirm the token was saved.
+    """
+    return tv.pair()
+
+
+# ---------------------------------------------------------------------------
 # TV state & power
 # ---------------------------------------------------------------------------
 

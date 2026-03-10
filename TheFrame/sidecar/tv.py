@@ -43,6 +43,25 @@ def _make_art() -> SamsungTVArt:
 
 
 # ---------------------------------------------------------------------------
+# Pairing
+# ---------------------------------------------------------------------------
+
+def pair() -> dict:
+    """
+    Trigger a WebSocket connection to the TV which causes the pairing prompt
+    to appear on screen. Accept it on the TV — the token is then saved to
+    token.txt and reused for all future connections.
+    """
+    try:
+        tv = _make_tv()
+        info = tv.rest_device_info()
+        return {"status": "paired", "deviceInfo": info}
+    except Exception as e:
+        return {"status": "waiting_for_approval", "detail": str(e),
+                "hint": "If the TV showed a pairing prompt, accept it and call /api/tv/pair again."}
+
+
+# ---------------------------------------------------------------------------
 # Power
 # ---------------------------------------------------------------------------
 
