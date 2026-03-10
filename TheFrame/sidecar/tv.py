@@ -63,8 +63,10 @@ def pair() -> dict:
     """
     try:
         tv = _make_tv()
-        info = tv.rest_device_info()
-        return {"status": "paired", "paired": True, "deviceInfo": info}
+        # send_key opens the WebSocket connection which triggers the pairing
+        # prompt and saves the auth token to token_file on success.
+        tv.send_key("KEY_LEFT")
+        return {"status": "paired", "paired": True}
     except Exception as e:
         return {"status": "waiting_for_approval", "paired": False, "detail": str(e),
                 "hint": "If the TV showed a pairing prompt, accept it and call /api/tv/pair again."}
