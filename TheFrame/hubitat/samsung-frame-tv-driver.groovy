@@ -113,16 +113,20 @@ def refresh() {
         return
     }
 
-    def power      = resp.power ?: "off"
-    def artMode    = resp.artMode ?: "unknown"
-    def isWatching = resp.isWatching ? "true" : "false"
+    def power         = resp.power ?: "off"
+    def artMode       = resp.artMode ?: "off"
+    def isWatching    = resp.isWatching ? "true" : "false"
+    def currentSource = resp.currentSource ?: ""
 
-    sendEvent(name: "switch",      value: power == "on" ? "on" : "off")
-    sendEvent(name: "artMode",     value: artMode)
-    sendEvent(name: "isWatching",  value: isWatching)
-    sendEvent(name: "lastUpdated", value: new Date().toString())
+    sendEvent(name: "switch",        value: power == "on" ? "on" : "off")
+    sendEvent(name: "artMode",       value: artMode)
+    sendEvent(name: "isWatching",    value: isWatching)
+    sendEvent(name: "lastUpdated",   value: new Date().toString())
+    if (currentSource) {
+        sendEvent(name: "currentInput", value: currentSource)
+    }
 
-    logDebug "State: power=${power}, artMode=${artMode}, isWatching=${isWatching}"
+    logDebug "State: power=${power}, artMode=${artMode}, isWatching=${isWatching}, source=${currentSource}"
 }
 
 // ---------------------------------------------------------------------------

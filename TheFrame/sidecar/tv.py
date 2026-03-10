@@ -7,6 +7,7 @@ import os
 import socket
 from typing import Optional
 
+import httpx
 import wakeonlan
 from samsungtvws import SamsungTVWS, SamsungTVArt
 
@@ -109,6 +110,31 @@ def get_art_mode() -> Optional[str]:
         return None
 
 
+def get_current_source() -> Optional[str]:
+    """
+    Query the Samsung REST API (port 8001) for the current input source.
+    Returns a friendly name if it matches a configured input, otherwise the raw value.
+    """
+    cfg = tv_config()
+    try:
+        resp = httpx.get(f"http://{cfg['host']}:8001/api/v2/", timeout=3)
+        resp.raise_for_status()
+        data = resp.json()
+        raw = data.get("device", {}).get("InputSource") or \
+              data.get("device", {}).get("inputSource")
+        if not raw:
+            return None
+        # Try to map back to a friendly name from config
+        mapping = input_map()
+        for friendly, key in mapping.items():
+            if raw.lower() in (friendly.lower(), key.lower()):
+                return friendly
+        return raw
+    except Exception as e:
+        logger.debug(f"Could not get input source: {e}")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -117,15 +143,21 @@ def get_state() -> dict:
     power = is_reachable()
     art_mode = None
     is_watching = False
+    current_source = None
 
     if power:
         art_mode = get_art_mode()
+        # If TV is on but art mode query failed, assume not in art mode
+        if art_mode is None:
+            art_mode = "off"
         is_watching = art_mode == "off"
+        current_source = get_current_source()
 
     return {
         "power": "on" if power else "off",
-        "artMode": art_mode or "unknown",
+        "artMode": art_mode or "off",
         "isWatching": is_watching,
+        "currentSource": current_source,
     }
 
 
