@@ -288,3 +288,23 @@ Common `intervalSeconds` values:
 sudo journalctl -u theframe -f             # live logs
 sudo journalctl -u theframe --since today  # today's logs
 ```
+
+---
+
+## Credits & Acknowledgements
+
+### Inspiration
+
+- **[samsung-tv-art-uploader](https://github.com/kohlerryan/samsung-tv-art-uploader)** by kohlerryan — the original inspiration for this project. A Docker-based art rotation service for the Samsung Frame TV with Home Assistant/MQTT integration. The architecture concept of a sidecar service wrapping the Samsung WebSocket API came from studying this project.
+
+### Libraries
+
+| Library | Purpose | License |
+|---|---|---|
+| **[samsungtvws](https://github.com/xchwarze/samsung-tv-ws-api)** by xchwarze | Core WebSocket communication with Samsung TVs. Handles the authentication token, WebSocket protocol, remote key codes, and the Frame TV art API (`SamsungTVWS`, `SamsungTVArt`). | MIT |
+| **[FastAPI](https://fastapi.tiangolo.com/)** | REST API framework for the sidecar service. Provides automatic OpenAPI docs at `/docs`. | MIT |
+| **[uvicorn](https://www.uvicorn.org/)** | ASGI server that runs the FastAPI application. | BSD |
+| **[httpx](https://www.python-httpx.org/)** | HTTP client used to fetch images from URLs for art upload and to query the Samsung REST API on port 8001. | BSD |
+| **[wakeonlan](https://github.com/remcohaszing/python-wakeonlan)** | Sends Wake-on-LAN magic packets to power on the TV remotely. | MIT |
+| **[PyYAML](https://pyyaml.org/)** | Parses the `config.yml` configuration file. | MIT |
+| **[python-multipart](https://github.com/Kludex/python-multipart)** | Enables file upload support in FastAPI. | Apache 2.0 |
