@@ -1,6 +1,15 @@
+import groovy.transform.Field
+
 /**
  * Samsung Frame TV Driver
  * Talks to the TheFrame sidecar service running on a local server (e.g. Raspberry Pi).
+ *
+ * Version: 1.1.0
+ *
+ * Changelog:
+ *   1.1.0 - Add paired attribute + pair() command, currentInput from state,
+ *            artMode defaults to 'unknown' when unpaired
+ *   1.0.0 - Initial release: power, inputs, art mode, art selection, slideshow
  *
  * Capabilities:
  *   - Switch (on/off)
@@ -8,8 +17,9 @@
  *   - Input switching (Apple TV, HDMI, etc.)
  *   - Art selection and slideshow control
  *   - isWatching detection (safe for night-time automations)
+ *   - Paired status + one-click pairing
  *
- * GitHub: https://github.com/your-repo/Hubitat-Projects/TheFrame
+ * GitHub: https://github.com/jedbro/Hubitat-Projects/tree/main/TheFrame
  */
 metadata {
     definition(
@@ -23,6 +33,7 @@ metadata {
         capability "Actuator"
         capability "Sensor"
 
+        attribute "driverVersion", "string"
         attribute "paired",       "enum", ["true", "false"]
         attribute "artMode",      "enum", ["on", "off", "unknown"]
         attribute "isWatching",   "enum", ["true", "false"]
@@ -63,13 +74,17 @@ metadata {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+@Field static final String DRIVER_VERSION = "1.1.0"
+
 def installed() {
-    log.info "Samsung Frame TV driver installed"
+    log.info "Samsung Frame TV driver installed (v${DRIVER_VERSION})"
+    sendEvent(name: "driverVersion", value: DRIVER_VERSION)
     initialize()
 }
 
 def updated() {
-    log.info "Samsung Frame TV driver updated"
+    log.info "Samsung Frame TV driver updated to v${DRIVER_VERSION}"
+    sendEvent(name: "driverVersion", value: DRIVER_VERSION)
     initialize()
 }
 
