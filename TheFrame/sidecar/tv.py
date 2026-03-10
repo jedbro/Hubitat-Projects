@@ -166,15 +166,17 @@ def get_state() -> dict:
 
     if power:
         art_mode = get_art_mode()
-        # If TV is on but art mode query failed, assume not in art mode
         if art_mode is None:
-            art_mode = "off"
-        is_watching = art_mode == "off"
+            # Can't determine art mode (likely not paired yet)
+            art_mode = "unknown"
+            is_watching = False   # safe default — don't assume watching
+        else:
+            is_watching = art_mode == "off"
         current_source = get_current_source()
 
     return {
         "power": "on" if power else "off",
-        "artMode": art_mode or "off",
+        "artMode": art_mode if art_mode else "unknown",
         "isWatching": is_watching,
         "currentSource": current_source,
     }
