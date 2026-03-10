@@ -50,7 +50,12 @@ def queue_set_art_mode(value: str) -> bool:
     if _send_queue is None:
         return False
     try:
-        _send_queue.put_nowait({"request": "set_artmode_status", "value": value})
+        from config import tv_config
+        uuid = _fetch_tv_uuid(tv_config().get("host", ""))
+        data: dict = {"request": "set_artmode_status", "value": value}
+        if uuid:
+            data["id"] = uuid
+        _send_queue.put_nowait(data)
         return True
     except asyncio.QueueFull:
         return False
@@ -69,6 +74,18 @@ def _art_channel_msg(data: dict) -> str:
             "event": "art_app_request",
         },
     })
+
+
+def _fetch_tv_uuid(host: str) -> Optional[str]:
+    """Fetch the TV's device UUID from the REST API (port 8001)."""
+    try:
+        import httpx
+        resp = httpx.get(f"http://{host}:8001/api/v2/", timeout=3)
+        resp.raise_for_status()
+        uid = resp.json().get("device", {}).get("duid") or resp.json().get("id")
+        return uid
+    except Exception:
+        return None
 
 
 async def _reader(ws) -> None:
@@ -112,13 +129,21 @@ async def _connect_and_watch(host: str, token: str, queue: asyncio.Queue) -> Non
     )
     logger.info(f"Art watcher: connecting to {host}")
 
+    # Fetch UUID for art requests (DaveGut's driver includes this as "id" —
+    # the TV ignores get_artmode_status without it on this firmware).
+    uuid = _fetch_tv_uuid(host)
+    logger.debug(f"Art watcher: TV UUID = {uuid}")
+
     async with websockets.connect(
         url, ssl=ssl_ctx, ping_interval=None, open_timeout=10
     ) as ws:
         logger.info("Art watcher: connected")
 
-        # Prime the cache with current status.
-        await ws.send(_art_channel_msg({"request": "get_artmode_status"}))
+        # Prime the cache with current status (include UUID as required by firmware).
+        status_req = {"request": "get_artmode_status"}
+        if uuid:
+            status_req["id"] = uuid
+        await ws.send(_art_channel_msg(status_req))
 
         reader_task = asyncio.create_task(_reader(ws))
         writer_task = asyncio.create_task(_writer(ws, queue))
