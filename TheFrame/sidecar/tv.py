@@ -10,6 +10,7 @@ from typing import Optional
 import httpx
 import wakeonlan
 from samsungtvws import SamsungTVWS, SamsungTVArt
+from samsungtvws import exceptions as tv_exceptions
 
 from config import tv_config, input_map
 
@@ -199,33 +200,56 @@ def get_state() -> dict:
 # Art operations
 # ---------------------------------------------------------------------------
 
+def _art_mode_required_error(e: Exception) -> dict:
+    """Return a clear error when art operations fail due to TV not being in Art Mode."""
+    return {
+        "error": "Art channel unavailable — TV must be in Art Mode for art operations",
+        "detail": str(e),
+    }
+
+
 def list_art() -> dict:
-    art = _make_art()
-    items = art.available()
-    return {"items": items}
+    try:
+        art = _make_art()
+        items = art.available()
+        return {"items": items}
+    except tv_exceptions.ConnectionFailure as e:
+        return _art_mode_required_error(e)
 
 
 def get_current_art() -> dict:
-    art = _make_art()
-    return art.get_current()
+    try:
+        art = _make_art()
+        return art.get_current()
+    except tv_exceptions.ConnectionFailure as e:
+        return _art_mode_required_error(e)
 
 
 def select_art(content_id: str) -> dict:
-    art = _make_art()
-    art.select_image(content_id)
-    return {"status": "ok", "contentId": content_id}
+    try:
+        art = _make_art()
+        art.select_image(content_id)
+        return {"status": "ok", "contentId": content_id}
+    except tv_exceptions.ConnectionFailure as e:
+        return _art_mode_required_error(e)
 
 
 def upload_art(image_bytes: bytes, file_type: str = "JPEG") -> dict:
-    art = _make_art()
-    result = art.upload(image_bytes, file_type=file_type)
-    return {"status": "ok", "result": result}
+    try:
+        art = _make_art()
+        result = art.upload(image_bytes, file_type=file_type)
+        return {"status": "ok", "result": result}
+    except tv_exceptions.ConnectionFailure as e:
+        return _art_mode_required_error(e)
 
 
 def set_slideshow(enabled: bool, interval_seconds: int = 1800) -> dict:
-    art = _make_art()
-    if enabled:
-        art.set_slideshow_status("on", duration=interval_seconds)
-    else:
-        art.set_slideshow_status("off")
+    try:
+        art = _make_art()
+        if enabled:
+            art.set_slideshow_status("on", duration=interval_seconds)
+        else:
+            art.set_slideshow_status("off")
+    except tv_exceptions.ConnectionFailure as e:
+        return _art_mode_required_error(e)
     return {"status": "ok", "slideshow": "on" if enabled else "off", "intervalSeconds": interval_seconds}
