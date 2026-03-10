@@ -132,24 +132,34 @@ async def _connect_and_watch(host: str, token: str, queue: asyncio.Queue) -> Non
     # Fetch UUID for art requests (DaveGut's driver includes this as "id" —
     # the TV ignores get_artmode_status without it on this firmware).
     uuid = _fetch_tv_uuid(host)
-    logger.debug(f"Art watcher: TV UUID = {uuid}")
+    logger.info(f"Art watcher: TV UUID = {uuid}")
 
     async with websockets.connect(
         url, ssl=ssl_ctx, ping_interval=None, open_timeout=10
     ) as ws:
         logger.info("Art watcher: connected")
 
-        # Prime the cache with current status (include UUID as required by firmware).
         status_req = {"request": "get_artmode_status"}
         if uuid:
             status_req["id"] = uuid
-        await ws.send(_art_channel_msg(status_req))
+
+        async def _poll_until_known():
+            """Re-send get_artmode_status every 30s until the TV responds."""
+            await asyncio.sleep(1)  # let connection settle
+            while _state["art_mode"] is None:
+                logger.debug("Art watcher: requesting artmode status")
+                try:
+                    await ws.send(_art_channel_msg(status_req))
+                except Exception:
+                    return
+                await asyncio.sleep(30)
 
         reader_task = asyncio.create_task(_reader(ws))
         writer_task = asyncio.create_task(_writer(ws, queue))
+        poll_task = asyncio.create_task(_poll_until_known())
         try:
             done, pending = await asyncio.wait(
-                {reader_task, writer_task},
+                {reader_task, writer_task, poll_task},
                 return_when=asyncio.FIRST_COMPLETED,
             )
             for task in pending:
