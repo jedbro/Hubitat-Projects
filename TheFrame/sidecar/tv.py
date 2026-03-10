@@ -176,6 +176,11 @@ def get_state() -> dict:
             current_app = st.get("currentApp")
             if not current_source:
                 current_source = st.get("inputSource")
+            # Use ST currentApp as fallback for artMode when watcher hasn't
+            # received a response yet (e.g. right after startup).
+            if art_mode is None and current_app is not None:
+                art_mode = "on" if current_app == "art" else "off"
+                is_watching = art_mode == "off"
 
     return {
         "power": "on" if power else "off",
