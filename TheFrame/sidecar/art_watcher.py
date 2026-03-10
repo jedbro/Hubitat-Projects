@@ -94,6 +94,7 @@ async def _reader(ws) -> None:
         try:
             msg = json.loads(raw)
             event = msg.get("event")
+            logger.info(f"Art watcher: rx event={event} data={str(msg.get('data', ''))[:120]}")
             if event == "d2d_service_message":
                 inner = json.loads(msg.get("data", "{}"))
                 if inner.get("event") in ("artmode_status", "art_mode_changed"):
@@ -102,7 +103,7 @@ async def _reader(ws) -> None:
                         _state["art_mode"] = status
                         logger.info(f"Art watcher: artMode → {status}")
         except Exception as e:
-            logger.debug(f"Art watcher: parse error: {e}")
+            logger.info(f"Art watcher: parse error: {e}")
 
 
 async def _writer(ws, queue: asyncio.Queue) -> None:
