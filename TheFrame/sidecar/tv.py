@@ -165,10 +165,6 @@ def get_state() -> dict:
 
     if power:
         art_mode = art_watcher.get_art_mode()
-        if art_mode is None:
-            is_watching = False  # safe default until watcher receives first event
-        else:
-            is_watching = art_mode == "off"
         current_source = get_current_source()
 
         st = st_poller.get()
@@ -180,7 +176,21 @@ def get_state() -> dict:
             # received a response yet (e.g. right after startup).
             if art_mode is None and current_app is not None:
                 art_mode = "on" if current_app == "art" else "off"
-                is_watching = art_mode == "off"
+
+        # Derive isWatching with a richer heuristic:
+        #   artMode == "on"  → definitely not watching
+        #   artMode == "off" → definitely watching
+        #   artMode unknown  → infer from available source/app signals
+        if art_mode == "on":
+            is_watching = False
+        elif art_mode == "off":
+            is_watching = True
+        else:
+            # artMode still unknown — treat as watching if there's an active
+            # input source or a non-art app (e.g. Apple TV on HDMI1)
+            has_source = bool(current_source)
+            has_active_app = bool(current_app and current_app != "art")
+            is_watching = has_source or has_active_app
 
     return {
         "power": "on" if power else "off",
