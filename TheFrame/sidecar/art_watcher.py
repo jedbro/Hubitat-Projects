@@ -159,10 +159,10 @@ async def _connect_and_watch(host: str, token: str, queue: asyncio.Queue) -> Non
 
         reader_task = asyncio.create_task(_reader(ws))
         writer_task = asyncio.create_task(_writer(ws, queue))
-        poll_task = asyncio.create_task(_poll_until_known())
+        asyncio.create_task(_poll_until_known())  # background — not in wait set
         try:
             done, pending = await asyncio.wait(
-                {reader_task, writer_task, poll_task},
+                {reader_task, writer_task},
                 return_when=asyncio.FIRST_COMPLETED,
             )
             for task in pending:
