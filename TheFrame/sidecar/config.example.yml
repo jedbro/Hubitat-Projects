@@ -1,0 +1,19 @@
+# TheFrame Sidecar Configuration
+# Copy this to config.yml and fill in your values
+
+tv:
+  host: "192.168.1.XXX"       # IP address of your Samsung Frame TV
+  mac: "AA:BB:CC:DD:EE:FF"    # MAC address for Wake-on-LAN (check TV network settings)
+  port: 8002
+  token_file: "token.txt"     # Persists the TV pairing token
+
+# Map friendly input names to Samsung key codes or source names
+# Common keys: KEY_HDMI1, KEY_HDMI2, KEY_HDMI3, KEY_HDMI4
+inputs:
+  appletv: "KEY_HDMI1"
+  hdmi2: "KEY_HDMI2"
+  hdmi3: "KEY_HDMI3"
+
+server:
+  host: "0.0.0.0"
+  port: 8088
