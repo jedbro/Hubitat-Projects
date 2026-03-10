@@ -7,6 +7,7 @@ import os
 import socket
 from typing import Optional
 
+import websocket as _websocket_module
 import httpx
 import wakeonlan
 from samsungtvws import SamsungTVWS, SamsungTVArt
@@ -18,23 +19,47 @@ from config import tv_config, input_map
 
 logger = logging.getLogger(__name__)
 
+_ART_TIMEOUT = 15  # seconds for art channel operations
+
 
 class _FrameTVArt(SamsungTVArt):
     """
-    Subclass that handles firmware versions that send ms.channel.clientConnect
-    instead of (or before) ms.channel.ready during the art-channel handshake.
-    The QN55LS03BAFXZA (2022 Frame) never sends ms.channel.ready — treating
-    clientConnect as the ready signal unblocks all art operations.
+    Art channel compatibility layer for 2022 Frame TV (QN55LS03BAFXZA).
+
+    Port 8002 (SSL + token): after ms.channel.connect the TV sends nothing more
+      — stock SamsungTVArt.open() hangs waiting for ms.channel.ready.
+    Port 8001 (no auth): TV sends ms.channel.clientConnect instead of ready
+      — stock SamsungTVArt.open() raises ConnectionFailure.
+
+    This subclass uses port 8002 for authenticated access and handles both
+    cases by treating a 3-second timeout or clientConnect as "channel ready".
     """
     def open(self):
-        # Let the grandparent handle the initial ms.channel.connect handshake.
+        # Ensure recv() respects the timeout (websocket-client only applies
+        # timeout to the connect phase by default, not to recv calls).
+        _websocket_module.setdefaulttimeout(_ART_TIMEOUT)
         SamsungTVWSConnection.open(self)
-        # Read the next frame: accept either ready or clientConnect as success.
-        event, frame = self._recv_frame()
-        if event in (MS_CHANNEL_READY_EVENT, MS_CHANNEL_CLIENT_CONNECT_EVENT):
-            return self.connection
-        self.close()
-        raise tv_exceptions.ConnectionFailure(frame)
+
+        # After ms.channel.connect, briefly wait for a ready/clientConnect event.
+        # Port 8002 sends nothing more → 3 s timeout = ready.
+        # Port 8001 sends ms.channel.clientConnect → also ready.
+        if self.connection:
+            self.connection.settimeout(3)
+        try:
+            event, frame = self._recv_frame()
+            if self.connection:
+                self.connection.settimeout(_ART_TIMEOUT)
+            if event in (MS_CHANNEL_READY_EVENT, MS_CHANNEL_CLIENT_CONNECT_EVENT):
+                return self.connection
+            self.close()
+            raise tv_exceptions.ConnectionFailure(frame)
+        except tv_exceptions.ConnectionFailure as e:
+            if "Time out" in str(e) or "timed out" in str(e).lower():
+                # Timeout means no extra event was sent — channel is ready.
+                if self.connection:
+                    self.connection.settimeout(_ART_TIMEOUT)
+                return self.connection
+            raise
 
 
 def _token_file_path() -> str:
@@ -56,11 +81,12 @@ def _make_tv() -> SamsungTVWS:
 
 def _make_art() -> _FrameTVArt:
     cfg = tv_config()
-    # SamsungTVArt v3.x uses port 8001 (REST) to bootstrap the D2D connection.
-    # Do NOT pass the WebSocket port (8002) here.
+    # Use port 8002 (SSL + token) for authenticated art channel access.
     return _FrameTVArt(
         host=cfg["host"],
+        port=cfg.get("port", 8002),
         token_file=_token_file_path(),
+        timeout=_ART_TIMEOUT,
     )
 
 
