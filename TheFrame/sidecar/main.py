@@ -2,10 +2,12 @@
 TheFrame Sidecar — FastAPI service for Samsung Frame TV control.
 Exposes a simple REST API consumed by the Hubitat driver.
 """
+import asyncio
 import logging
 import platform
 import sys
 import time
+from contextlib import asynccontextmanager
 from typing import Optional
 
 import httpx
@@ -13,18 +15,26 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+import art_watcher
 import tv
 from config import load_config, server_config, tv_config, input_map
 
-SIDECAR_VERSION = "1.1.0"
+SIDECAR_VERSION = "1.2.0"
 _start_time = time.time()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="TheFrame Sidecar", version="1.0.0")
-
 load_config()
+
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    asyncio.create_task(art_watcher.watch_forever())
+    yield
+
+
+app = FastAPI(title="TheFrame Sidecar", version=SIDECAR_VERSION, lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------
