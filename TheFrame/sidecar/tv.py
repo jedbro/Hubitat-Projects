@@ -36,9 +36,10 @@ def _make_tv() -> SamsungTVWS:
 
 def _make_art() -> SamsungTVArt:
     cfg = tv_config()
+    # SamsungTVArt v3.x uses port 8001 (REST) to bootstrap the D2D connection.
+    # Do NOT pass the WebSocket port (8002) here.
     return SamsungTVArt(
         host=cfg["host"],
-        port=cfg.get("port", 8002),
         token_file=_token_file_path(),
     )
 
