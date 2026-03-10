@@ -10,6 +10,7 @@ from typing import Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 import tv
@@ -40,6 +41,15 @@ class SlideshowRequest(BaseModel):
 class UploadUrlRequest(BaseModel):
     url: str
     fileType: Optional[str] = "JPEG"
+
+
+# ---------------------------------------------------------------------------
+# Root redirect
+# ---------------------------------------------------------------------------
+
+@app.get("/")
+def root():
+    return RedirectResponse(url="/docs")
 
 
 # ---------------------------------------------------------------------------
