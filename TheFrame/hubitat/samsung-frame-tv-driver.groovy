@@ -14,8 +14,8 @@
 metadata {
     definition(
         name: "Samsung Frame TV",
-        namespace: "theframe",
-        author: "Your Name",
+        namespace: "Logicalnonsense",
+        author: "Jed Brown",
         description: "Controls a Samsung Frame TV via the TheFrame sidecar API"
     ) {
         capability "Switch"
