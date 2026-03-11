@@ -157,15 +157,25 @@ def get_state() -> dict:
     import art_watcher
     import st_poller
     paired = is_paired()
-    power = is_reachable()
-    art_mode = None
+    reachable = is_reachable()
+
+    # Read art watcher cache regardless of reachability. The persistent WebSocket
+    # connection survives Art Mode even though Art Mode closes port 8002 to new
+    # connections — so the watcher may have valid state when is_reachable() fails.
+    art_mode = art_watcher.get_art_mode()
+
+    # TV is "on" if network-reachable OR the watcher confirms it's in art mode.
+    power = reachable or (art_mode == "on")
+
     is_watching = False
     current_source = None
     current_app = None
 
     if power:
-        art_mode = art_watcher.get_art_mode()
-        current_source = get_current_source()
+        # Only query the local REST API (port 8001) when the TV is fully reachable;
+        # in Art Mode the port may be closed.
+        if reachable:
+            current_source = get_current_source()
 
         st = st_poller.get()
         if st:
