@@ -1,6 +1,6 @@
 --- /tmp/SamsungTVRemote.orig.groovy	2026-03-10 17:42:43
-+++ /tmp/SamsungTVRemote.groovy	2026-03-10 18:17:26
-@@ -451,13 +451,16 @@
++++ /tmp/SamsungTVRemote.groovy	2026-03-11 06:59:24
+@@ -451,13 +451,25 @@
  
  def getArtModeStatus() { // library marker davegut.samsungTvWebsocket, line 82
  	if (getDataValue("frameTv") == "true") { // library marker davegut.samsungTvWebsocket, line 83
@@ -14,17 +14,26 @@
 +		//	FIX: Always send get_artmode_status regardless of artModeWs flag.
 +		//	On 2022 firmware the TV won't set artModeWs=true until it responds,
 +		//	so the old guard prevented the very request needed to prime the state.
-+		//	Retry every 30s until the TV confirms (artModeWs becomes true).
++		//	Retry every 30s (up to 5 attempts) until the TV confirms.
 +		def data = [request:"get_artmode_status", // library marker davegut.samsungTvWebsocket, line 85
 +					id: "${getDataValue("uuid")}"] // library marker davegut.samsungTvWebsocket, line 86
 +		data = JsonOutput.toJson(data) // library marker davegut.samsungTvWebsocket, line 87
 +		artModeCmd(data) // library marker davegut.samsungTvWebsocket, line 88
 +		if (!state.artModeWs) { // library marker davegut.samsungTvWebsocket, line 89
-+			runIn(30, getArtModeStatus) // retry until TV responds
++			def retries = (state.artModeRetry ?: 0) as Integer
++			if (retries < 5) {
++				state.artModeRetry = retries + 1
++				runIn(30, getArtModeStatus)
++			} else {
++				state.artModeRetry = 0
++				logWarn("getArtModeStatus: no response after 5 attempts — TV may not support art mode WS")
++			}
++		} else {
++			state.artModeRetry = 0 // reset on success
  		} // library marker davegut.samsungTvWebsocket, line 91
  	} // library marker davegut.samsungTvWebsocket, line 92
  } // library marker davegut.samsungTvWebsocket, line 93
-@@ -649,6 +652,13 @@
+@@ -649,6 +661,13 @@
  			state.wsData = "" // library marker davegut.samsungTvWebsocket, line 279
  			logData << [action: "execMessage"] // library marker davegut.samsungTvWebsocket, line 280
  		} // library marker davegut.samsungTvWebsocket, line 281
@@ -38,7 +47,7 @@
  	} else if (message == "status: closing") { // library marker davegut.samsungTvWebsocket, line 282
  		status = "closed" // library marker davegut.samsungTvWebsocket, line 283
  		state.currentFunction = "close" // library marker davegut.samsungTvWebsocket, line 284
-@@ -680,13 +690,20 @@
+@@ -680,13 +699,20 @@
  				break // library marker davegut.samsungTvWebsocket, line 310
  			case "d2d_service_message": // library marker davegut.samsungTvWebsocket, line 311
  				def data = parseJson(resp.data) // library marker davegut.samsungTvWebsocket, line 312
