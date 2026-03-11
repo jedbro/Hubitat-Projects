@@ -90,7 +90,7 @@ def power_on() -> dict:
 
 def power_off() -> dict:
     tv = _make_tv()
-    tv.send_key("KEY_POWER")
+    tv.send_key("KEY_POWEROFF")
     return {"status": "ok"}
 
 
