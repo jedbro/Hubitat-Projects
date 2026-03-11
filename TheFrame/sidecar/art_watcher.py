@@ -151,16 +151,20 @@ async def _connect_and_watch(host: str, token: str, queue: asyncio.Queue) -> Non
         if uuid:
             status_req["id"] = uuid
 
-        async def _poll_until_known():
-            """Re-send get_artmode_status every 30s until the TV responds."""
+        async def _poll_until_known(max_attempts: int = 5):
+            """Re-send get_artmode_status every 30s until the TV responds (max 5 attempts)."""
             await asyncio.sleep(1)  # let connection settle
-            while _state["art_mode"] is None:
-                logger.debug("Art watcher: requesting artmode status")
+            for attempt in range(1, max_attempts + 1):
+                if _state["art_mode"] is not None:
+                    return
+                logger.debug(f"Art watcher: requesting artmode status (attempt {attempt}/{max_attempts})")
                 try:
                     await ws.send(_art_channel_msg(status_req))
                 except Exception:
                     return
                 await asyncio.sleep(30)
+            if _state["art_mode"] is None:
+                logger.warning("Art watcher: no artmode response after %d attempts", max_attempts)
 
         reader_task = asyncio.create_task(_reader(ws))
         writer_task = asyncio.create_task(_writer(ws, queue))
