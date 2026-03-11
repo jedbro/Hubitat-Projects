@@ -1,0 +1,65 @@
+--- /tmp/SamsungTVRemote.orig.groovy	2026-03-10 17:42:43
++++ /tmp/SamsungTVRemote.groovy	2026-03-10 18:17:26
+@@ -451,13 +451,16 @@
+ 
+ def getArtModeStatus() { // library marker davegut.samsungTvWebsocket, line 82
+ 	if (getDataValue("frameTv") == "true") { // library marker davegut.samsungTvWebsocket, line 83
+-		if (state.artModeWs) { // library marker davegut.samsungTvWebsocket, line 84
+-			def data = [request:"get_artmode_status", // library marker davegut.samsungTvWebsocket, line 85
+-						id: "${getDataValue("uuid")}"] // library marker davegut.samsungTvWebsocket, line 86
+-			data = JsonOutput.toJson(data) // library marker davegut.samsungTvWebsocket, line 87
+-			artModeCmd(data) // library marker davegut.samsungTvWebsocket, line 88
+-		} else { // library marker davegut.samsungTvWebsocket, line 89
+-			refresh() // library marker davegut.samsungTvWebsocket, line 90
++		//	FIX: Always send get_artmode_status regardless of artModeWs flag.
++		//	On 2022 firmware the TV won't set artModeWs=true until it responds,
++		//	so the old guard prevented the very request needed to prime the state.
++		//	Retry every 30s until the TV confirms (artModeWs becomes true).
++		def data = [request:"get_artmode_status", // library marker davegut.samsungTvWebsocket, line 85
++					id: "${getDataValue("uuid")}"] // library marker davegut.samsungTvWebsocket, line 86
++		data = JsonOutput.toJson(data) // library marker davegut.samsungTvWebsocket, line 87
++		artModeCmd(data) // library marker davegut.samsungTvWebsocket, line 88
++		if (!state.artModeWs) { // library marker davegut.samsungTvWebsocket, line 89
++			runIn(30, getArtModeStatus) // retry until TV responds
+ 		} // library marker davegut.samsungTvWebsocket, line 91
+ 	} // library marker davegut.samsungTvWebsocket, line 92
+ } // library marker davegut.samsungTvWebsocket, line 93
+@@ -649,6 +652,13 @@
+ 			state.wsData = "" // library marker davegut.samsungTvWebsocket, line 279
+ 			logData << [action: "execMessage"] // library marker davegut.samsungTvWebsocket, line 280
+ 		} // library marker davegut.samsungTvWebsocket, line 281
++		//	FIX: When the art channel connects, immediately request current
++		//	art mode status so artModeStatus is populated without waiting for
++		//	the TV to push an organic change event.
++		if (state.currentFunction == "frameArt") {
++			runIn(1, getArtModeStatus)
++			logData << [action: "artModeStatusRequested"]
++		}
+ 	} else if (message == "status: closing") { // library marker davegut.samsungTvWebsocket, line 282
+ 		status = "closed" // library marker davegut.samsungTvWebsocket, line 283
+ 		state.currentFunction = "close" // library marker davegut.samsungTvWebsocket, line 284
+@@ -680,13 +690,20 @@
+ 				break // library marker davegut.samsungTvWebsocket, line 310
+ 			case "d2d_service_message": // library marker davegut.samsungTvWebsocket, line 311
+ 				def data = parseJson(resp.data) // library marker davegut.samsungTvWebsocket, line 312
++				//	FIX: 2022 Frame TV firmware responds to get_artmode_status requests
++				//	with event name "get_artmode_status" (not "artmode_status").
++				//	Without this case the initial status query is silently dropped
++				//	and artModeStatus stays "none" until the TV pushes a change.
+ 				if (data.event == "artmode_status" || // library marker davegut.samsungTvWebsocket, line 313
+-					data.event == "art_mode_changed") { // library marker davegut.samsungTvWebsocket, line 314
++					data.event == "art_mode_changed" ||
++					data.event == "get_artmode_status") { // library marker davegut.samsungTvWebsocket, line 314
+ 					def status = data.value // library marker davegut.samsungTvWebsocket, line 315
+ 					if (status == null) { status = data.status } // library marker davegut.samsungTvWebsocket, line 316
+-					sendEvent(name: "artModeStatus", value: status) // library marker davegut.samsungTvWebsocket, line 317
+-					logData << [artModeStatus: status] // library marker davegut.samsungTvWebsocket, line 318
+-					state.artModeWs = true // library marker davegut.samsungTvWebsocket, line 319
++					if (status in ["on", "off"]) {
++						sendEvent(name: "artModeStatus", value: status) // library marker davegut.samsungTvWebsocket, line 317
++						logData << [artModeStatus: status] // library marker davegut.samsungTvWebsocket, line 318
++						state.artModeWs = true // library marker davegut.samsungTvWebsocket, line 319
++					}
+ 				} // library marker davegut.samsungTvWebsocket, line 320
+ 				break // library marker davegut.samsungTvWebsocket, line 321
+ 			case "ms.error": // library marker davegut.samsungTvWebsocket, line 322
