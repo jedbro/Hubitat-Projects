@@ -113,8 +113,11 @@ def set_input(name: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def art_mode_on() -> dict:
-    import art_watcher
-    art_watcher.queue_set_art_mode("on")
+    # KEY_POWER toggles from TV/watching mode into Art Mode on this firmware.
+    # The art watcher will receive the resulting art_mode_changed event and
+    # update its cache automatically.
+    tv = _make_tv()
+    tv.send_key("KEY_POWER")
     return {"status": "ok", "artMode": "on"}
 
 
