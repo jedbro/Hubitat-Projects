@@ -83,6 +83,10 @@ def _fetch_tv_uuid(host: str) -> Optional[str]:
         resp = httpx.get(f"http://{host}:8001/api/v2/", timeout=3)
         resp.raise_for_status()
         uid = resp.json().get("device", {}).get("duid") or resp.json().get("id")
+        # TV returns duid as "uuid:XXXX" — strip the prefix; the TV expects
+        # just the bare UUID in art channel requests (per DaveGut: .substring(5))
+        if uid and uid.startswith("uuid:"):
+            uid = uid[5:]
         return uid
     except Exception:
         return None
