@@ -2,6 +2,20 @@
 Hubitat - Samsung TV Remote Driver
 		Copyright 2022 Dave Gutheinz
 License:  https://github.com/DaveGut/HubitatActive/blob/master/KasaDevices/License.md
+===== 2025 Version 2.4.0 ====================================================================
+Improved Art Mode state reliability on 2022 Frame TV firmware (22_PONTUSM_FTV).
+Three targeted fixes — no behaviour changes for non-Frame or pre-2022 TVs.
+a.	parse(): Added "get_artmode_status" to handled d2d_service_message events.
+	2022 firmware responds to status requests using this event name rather than
+	"artmode_status", so the initial query was silently dropped and artModeStatus
+	remained "none" until the TV organically pushed a change event.
+b.	webSocketStatus(): When the art channel (frameArt) WebSocket opens, immediately
+	request artModeStatus so the attribute is populated on every connect/reconnect
+	without waiting for an organic TV-pushed event.
+c.	getArtModeStatus(): Removed the artModeWs guard that blocked sending the status
+	request before the first response — a chicken-and-egg problem that prevented
+	the channel from ever being confirmed. Now retries every 30s up to 5 attempts,
+	then logs a warning and stops rather than retrying indefinitely.
 ===== 2024 Version 2.3.9 ====================================================================
 a.  Created preset functions (create, execute, trigger). Function work with and without
 	SmartThings.  SEE DOCUMENTATION.
