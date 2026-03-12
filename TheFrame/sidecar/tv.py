@@ -167,30 +167,32 @@ def get_state() -> dict:
     # connections — so the watcher may have valid state when is_reachable() fails.
     art_mode = art_watcher.get_art_mode()
 
-    # TV is "on" if network-reachable OR the watcher confirms it's in art mode.
-    power = reachable or (art_mode == "on")
+    # Always fetch SmartThings data — it is a cloud API and is not affected by
+    # the TV closing local ports in Art Mode. This is the only reliable signal
+    # when the sidecar started (or the art watcher reconnected) while the TV was
+    # already in Art Mode and port 8002 was unavailable.
+    st = st_poller.get()
+    current_app = st.get("currentApp") if st else None
+    current_source = st.get("inputSource") if st else None
+
+    # Use ST currentApp as fallback for artMode when the watcher cache is empty.
+    if art_mode is None and current_app is not None:
+        art_mode = "on" if current_app == "art" else "off"
+
+    # TV is "on" if network-reachable, the watcher confirms art mode, or ST says on.
+    power = reachable or (art_mode == "on") or (st.get("stPower") == "on" if st else False)
 
     is_watching = False
-    current_source = None
-    current_app = None
 
     if power:
         # Only query the local REST API (port 8001) when the TV is fully reachable;
         # in Art Mode the port may be closed.
         if reachable:
-            current_source = get_current_source()
+            local_source = get_current_source()
+            if local_source:
+                current_source = local_source
 
-        st = st_poller.get()
-        if st:
-            current_app = st.get("currentApp")
-            if not current_source:
-                current_source = st.get("inputSource")
-            # Use ST currentApp as fallback for artMode when watcher hasn't
-            # received a response yet (e.g. right after startup).
-            if art_mode is None and current_app is not None:
-                art_mode = "on" if current_app == "art" else "off"
-
-        # Derive isWatching with a richer heuristic:
+        # Derive isWatching:
         #   artMode == "on"  → definitely not watching
         #   artMode == "off" → definitely watching
         #   artMode unknown  → infer from available source/app signals
