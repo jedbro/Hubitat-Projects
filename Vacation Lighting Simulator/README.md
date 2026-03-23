@@ -38,13 +38,10 @@ Great for porch lights, hallway lamps, or areas typically left lit during the ev
 - Carefully avoids unnecessary triggers and timers.
 
 ### 💤 Auto-Shutoff When Leaving the Allowed Window
-The app instantly stops and turns off:
-- All randomized lights still running  
-- All anchor lights  
-when:
-- Mode changes  
-- Vacation switch turns off  
-- Time window ends  
+The app instantly stops and turns off all randomized lights and anchor lights when:
+- Mode changes **away from an allowed mode** (only if the app was actively simulating)
+- Vacation switch turns off
+- Time window ends
 
 ### 📬 Daily Summary Notifications (Optional)
 Receive a once-per-day summary that includes:
@@ -222,6 +219,15 @@ Try:
 ---
 
 # 🔄 Changelog
+
+## **v0.4.0 — March 2026**
+✔ Configuration checklist on the main page — ✅/❌/⚠️ status for each required setting at a glance.
+✔ Dynamic arming summary in Setup — one-sentence explanation of the effective arming condition, updated live as you configure modes and vacation switch.
+✔ Enhanced status dashboard — arming context, time since last cycle, frequency/pool summary, and will-run indicator.
+✔ Actionable "Why not running" diagnostics — shows specific reasons with bold key values and hints for how to resolve each condition.
+✔ Test section collapsed by default — includes a clear button and displays the last test result.
+✔ Time window page now shows the resolved today's window (actual times) when sunrise/sunset offsets are used.
+✔ Fix: anchor lights are no longer turned off during mode changes when the app was not actively simulating.
 
 ## **v0.3.3 — February 2026**
 ✔ Fix to ensure schedule maintains over multiple days.

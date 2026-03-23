@@ -1,6 +1,15 @@
 /**
  *  Vacation Lighting Simulator (Child)
 
+ *  V0.4.0 - March 2026
+ *    - Configuration checklist on main page (shows ✅/❌/⚠️ for each setting)
+ *    - Dynamic arming summary in Setup page (explains effective arming condition)
+ *    - Enhanced status dashboard: arming context, time since last cycle, frequency info
+ *    - Actionable "Why not running" diagnostics with specific hints
+ *    - Test cycle section collapsed by default; add clear button + last test result
+ *    - Time window page shows resolved today's window when sunrise/sunset used
+ *    - Fix: anchor lights no longer turned off during mode changes when app was not running
+ *
  *  V0.3.3 - February 2026
  *    - Fix to ensure schedule maintains over multiple days
  *    - Option for notifications to be immediate after a session
@@ -58,7 +67,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.3.3 • Feb 2026"
+@Field static final String APP_VERSION = "v0.4.0 • Mar 2026"
 
 definition(
     name: "Vacation Lighting Simulator",
@@ -166,6 +175,30 @@ private String nextCycleStatus() {
     return "~${mins} minutes."
 }
 
+private String timeSinceLastCycle() {
+    def ts = state?.lastCycleAt
+    if (!ts) return null
+    long diff = now() - (ts as Long)
+    int mins = Math.round(diff / 60000.0)
+    if (mins <= 1) return "~1 minute ago"
+    return "~${mins} minutes ago"
+}
+
+private String armingContext() {
+    boolean modesConfigured = hasModeRestriction()
+    boolean switchIsOn = vacationSwitchOn()
+    boolean modeAllowed = modesConfigured && (modeOk as boolean)
+
+    if (switchIsOn && modeAllowed) {
+        return "Armed by: ${location.mode} mode + vacation switch ON"
+    } else if (switchIsOn) {
+        return "Armed by: vacation switch override"
+    } else if (modeAllowed) {
+        return "Armed by: ${location.mode} mode"
+    }
+    return ""
+}
+
 private String activeLightsWarning() {
     if (!switches || !number_of_active_lights) return ""
     int n = (number_of_active_lights as Integer)
@@ -181,42 +214,57 @@ private String activeLightsWarning() {
 
 /**
  * Explain why the app is not running / not armed based on current conditions.
+ * Returns an HTML string with actionable hints after each reason.
  */
 private String whyNotRunning() {
     def reasons = []
 
     if (newMode && !modeOk && !vacationSwitchOn()) {
-        reasons << "Mode '${location.mode}' is not in allowed modes ${newMode}"
+        def modeList = (newMode instanceof List) ? newMode.join(", ") : "${newMode}"
+        reasons << "Current mode '<b>${location.mode}</b>' is not in allowed modes [<b>${modeList}</b>]. " +
+                   "Go to Setup to change allowed modes, or turn on the vacation switch to override."
     }
 
     // Vacation switch reasons depend on whether modes are configured.
     if (vacationSwitch && !vacationSwitchOn()) {
-        def sw = vacationSwitch.currentSwitch
+        def sw = vacationSwitch.currentSwitch ?: 'unknown'
         if (!hasModeRestriction()) {
-            reasons << "Vacation switch '${vacationSwitch.displayName}' is ${sw ?: 'unknown'}"
+            reasons << "Vacation switch '<b>${vacationSwitch.displayName}</b>' is <b>${sw}</b> — turn it ON to arm the app."
         } else if (!modeOk) {
-            reasons << "Mode '${location.mode}' is not allowed and vacation switch '${vacationSwitch.displayName}' is ${sw ?: 'unknown'}"
+            reasons << "Mode '<b>${location.mode}</b>' is not allowed and vacation switch '<b>${vacationSwitch.displayName}</b>' is <b>${sw}</b>. " +
+                       "Turning the switch ON would bypass the mode restriction."
         }
     }
 
     if (!daysOk && days) {
-        reasons << "Today is not in allowed days ${days}"
+        def df = new java.text.SimpleDateFormat("EEEE")
+        if (getTimeZone()) df.setTimeZone(getTimeZone())
+        def today = df.format(new Date())
+        def dayList = (days instanceof List) ? days.join(", ") : "${days}"
+        reasons << "Today is <b>${today}</b>, which is not in the allowed days [<b>${dayList}</b>]. " +
+                   "Check Settings → Advanced to adjust day restrictions."
     }
 
     if (!timeOk && !vacationSwitchOn() && (startTimeType || endTimeType || starting || ending)) {
         def win = timeIntervalLabel()
+        def tz = getTimeZone()
+        def fmt = new SimpleDateFormat("h:mm a")
+        if (tz) fmt.setTimeZone(tz)
+        def nowStr = fmt.format(new Date())
         if (win) {
-            reasons << "Current time is outside the configured window (${win})"
+            reasons << "Current time (<b>${nowStr}</b>) is outside the configured window (<b>${win}</b>). " +
+                       "Go to Setup → Time window to adjust, or turn on the vacation switch to bypass."
         } else {
-            reasons << "Current time is outside the configured time window"
+            reasons << "Current time (<b>${nowStr}</b>) is outside the configured time window. " +
+                       "Go to Setup → Time window to review."
         }
     }
 
     if (!reasons) {
-        return "Not running, but no specific blockers detected (check configuration)."
+        return "No specific blockers detected — check that lights are configured in Setup."
     }
 
-    return "Not running because: " + reasons.join("; ")
+    return reasons.join("<br>")
 }
 
 private String appStatus() {
@@ -241,7 +289,7 @@ private String appStatus() {
     if (!configured) {
         sb << "<b>Status:</b> <span style='color:#cc0000;'>🔴 Not fully configured.</span><br>"
         sb << "<b>Current mode:</b> ${modeName}<br>"
-        sb << "Configure Modes and/or a Vacation switch plus your lights to enable vacation lighting."
+        sb << "Configure modes and/or a vacation switch, plus your lights to enable vacation lighting."
         return sb.toString()
     }
 
@@ -249,6 +297,8 @@ private String appStatus() {
     boolean running = state?.Running ?: false
     boolean sched   = state?.schedRunning ?: false
     boolean queued  = (state?.lightSchedule instanceof Map) && !state.lightSchedule.isEmpty()
+    boolean switchOverride = vacationSwitchOn()
+    boolean inWindow = (timeOk || switchOverride)
 
     String icon
     String color
@@ -258,10 +308,14 @@ private String appStatus() {
         icon  = "✅"
         color = "#008800"
         label = "Active (simulating occupancy)"
-    } else if (armed) {
+    } else if (armed && inWindow) {
         icon  = "🟢"
         color = "#008800"
-        label = "Armed (ready; waiting for next cycle within the allowed time window)"
+        label = "Armed (ready)"
+    } else if (armed) {
+        icon  = "🟡"
+        color = "#cc9900"
+        label = "Armed (outside time window)"
     } else {
         icon  = "🟡"
         color = "#cc9900"
@@ -275,6 +329,22 @@ private String appStatus() {
     }
     sb << "<br>"
 
+    // Arming context — show what is keeping the app armed
+    if (armed || running || sched || queued) {
+        String ctx = armingContext()
+        if (ctx) {
+            sb << "<b>${ctx}</b><br>"
+        }
+    }
+
+    // Frequency/pool summary
+    if (switches) {
+        Integer freq = (frequency_minutes ?: 15) as Integer
+        Integer numActive = (number_of_active_lights ?: 1) as Integer
+        sb << "<small style='color:#666;'>Cycling every ~${freq} min with up to ${numActive} light(s) from a pool of ${switches.size()}</small><br>"
+    }
+
+    // Last cycle info
     if (!lastRand.isEmpty()) {
         sb << "<b>Last cycle randomized:</b> ${lastRand.join(', ')}<br>"
     }
@@ -282,18 +352,36 @@ private String appStatus() {
         sb << "<b>Anchor lights in last cycle:</b> ${lastAnch.join(', ')}<br>"
     }
 
+    // Time since last cycle + next cycle countdown
+    String sinceStr = timeSinceLastCycle()
+    String nextStr  = nextCycleStatus()
+    if (sinceStr) {
+        sb << "<b>Last cycle:</b> ${sinceStr}. <b>Next cycle:</b> ${nextStr}<br>"
+    } else {
+        sb << "<b>Next cycle:</b> ${nextStr}<br>"
+    }
+
     sb << "<b>Since last summary:</b> ${cycles} cycles, ${lightsOn} light-ons, ${lightsOff} light-offs.<br>"
-    sb << "<b>Next cycle:</b> ${nextCycleStatus()}<br>"
+
+    // What would trigger it when armed but outside window
+    if (armed && !inWindow) {
+        def winLabel = timeIntervalLabel()
+        if (winLabel) {
+            sb << "<b>Will run:</b> ${winLabel}<br>"
+        }
+    }
 
     def warn = activeLightsWarning()
     if (warn) {
         sb << "<b>Notes:</b> ${warn}<br>"
     }
 
-    if (!armed) {
+    // Diagnostics when not actively cycling
+    if (!running && !sched && !queued) {
+        String diagLabel = armed ? "Why not cycling" : "Why not running"
         def debugLine = whyNotRunning()
         if (debugLine) {
-            sb << "<b>Why not running:</b> ${debugLine}"
+            sb << "<b>${diagLabel}:</b> ${debugLine}"
         }
     }
 
@@ -313,6 +401,105 @@ private String getFormat(String type, String myText = "") {
         default:
             return myText
     }
+}
+
+/**
+ * Build a quick-glance configuration checklist for the main page.
+ * Shows ✅/❌/⚠️ for each key setting so new users can see what's missing at a glance.
+ */
+private String configChecklist() {
+    StringBuilder sb = new StringBuilder()
+    sb << "<div style='margin:4px 0;line-height:1.8;'>"
+
+    // Arming
+    boolean hasModes  = hasModeRestriction()
+    boolean hasSwitch = (vacationSwitch != null)
+    if (hasModes && hasSwitch) {
+        def modeList = (newMode instanceof List) ? newMode.join(", ") : "${newMode}"
+        sb << "✅ <b>Arming:</b> ${modeList} + vacation switch<br>"
+    } else if (hasModes) {
+        def modeList = (newMode instanceof List) ? newMode.join(", ") : "${newMode}"
+        sb << "✅ <b>Arming:</b> ${modeList} mode(s)<br>"
+    } else if (hasSwitch) {
+        sb << "✅ <b>Arming:</b> vacation switch only<br>"
+    } else {
+        sb << "❌ <b>Arming:</b> not configured — go to Setup to choose modes or a vacation switch<br>"
+    }
+
+    // Lights
+    if (switches && switches.size() > 0) {
+        int numActive   = (number_of_active_lights ?: 1) as Integer
+        int numSwitches = switches.size()
+        if (numActive > numSwitches) {
+            sb << "⚠️ <b>Lights:</b> ${numSwitches} switches, active count (${numActive}) exceeds pool — will clamp to ${numSwitches}<br>"
+        } else {
+            sb << "✅ <b>Lights:</b> ${numSwitches} switches, up to ${numActive} per cycle<br>"
+        }
+    } else {
+        sb << "❌ <b>Lights:</b> no switches configured — go to Setup to add lights<br>"
+    }
+
+    // Time window
+    def winLabel = timeIntervalLabel()
+    if (winLabel) {
+        sb << "✅ <b>Time window:</b> ${winLabel}<br>"
+    } else {
+        sb << "⚠️ <b>Time window:</b> not set — runs any time when armed<br>"
+    }
+
+    // Notifications
+    if (summaryDevice) {
+        sb << "✅ <b>Notifications:</b> configured<br>"
+    } else {
+        sb << "⚠️ <b>Notifications:</b> not configured<br>"
+    }
+
+    sb << "</div>"
+    return sb.toString()
+}
+
+/**
+ * Return a one-sentence summary of the effective arming condition based on current inputs.
+ * Used in Setup() with submitOnChange so it re-renders as the user configures modes/switch.
+ */
+private String dynamicArmingSummary() {
+    boolean hasModes  = hasModeRestriction()
+    boolean hasSwitch = (vacationSwitch != null)
+
+    if (!hasModes && !hasSwitch) {
+        return "<span style='color:#cc9900;'>⚠️ Nothing configured — app will not arm.</span>"
+    } else if (hasModes && !hasSwitch) {
+        def modeList = (newMode instanceof List) ? newMode.join(", ") : "${newMode}"
+        return "App arms when mode is: <b>${modeList}</b>"
+    } else if (!hasModes && hasSwitch) {
+        def swName = vacationSwitch?.displayName ?: "selected vacation switch"
+        return "App arms only when <b>${swName}</b> switch is ON"
+    } else {
+        def modeList = (newMode instanceof List) ? newMode.join(", ") : "${newMode}"
+        def swName   = vacationSwitch?.displayName ?: "selected vacation switch"
+        return "App arms when mode is <b>${modeList}</b>, OR when <b>${swName}</b> switch is ON " +
+               "(switch also bypasses time/day restrictions)"
+    }
+}
+
+/**
+ * Return a human-readable resolved time window for today using sunrise/sunset data.
+ * Only returns a value when both start and end are configured.
+ */
+private String resolvedTimeWindow() {
+    if (!startTimeType && !starting) return null
+    if (!endTimeType && !ending) return null
+
+    def start = timeWindowStart()
+    def stop  = timeWindowStop()
+    if (!start || !stop) return null
+
+    def tz = getTimeZone()
+    if (!tz) return null
+
+    def fmt = new SimpleDateFormat("h:mm a")
+    fmt.setTimeZone(tz)
+    return "Today's window: ${fmt.format(start)} → ${fmt.format(stop)}"
 }
 
 // --------- PAGES ---------
@@ -337,6 +524,12 @@ def pageSetup() {
             paragraph appStatus()
         }
 
+        // --- CONFIGURATION CHECKLIST ---
+        section("") {
+            paragraph getFormat("header-blue", "Configuration")
+            paragraph configChecklist()
+        }
+
         section("") {
             paragraph "This app simulates occupancy when you are away. Use the sections below to configure when it runs and which lights it controls."
         }
@@ -357,17 +550,26 @@ def pageSetup() {
                 description: ""
         }
 
-        // --- OPTIONS (combined with Tools & Testing) ---
+        // --- LABEL ---
         section("") {
-            paragraph getFormat("header-blue", "Options")
-            paragraph "By turning on this Test Cycle toggle and selecting 'Done' to save the setting, a single cycle will be kicked off for testing. Please not that anchor lights will be turned on and not back off since this only simulates the first cycle and summary."
-            input "runTestNow", "bool",
-                title: "Run a test cycle now?",
-                defaultValue: false,
-                submitOnChange: false,
-                description: "Optional. Set to ON and click Done to trigger one test cycle."
+            label title: "Assign a name for this app (useful if you have multiple instances):", required: false
+        }
 
-            label title:"Assign a name for this app (Useful if you have multiple instances):", required:false
+        // --- TEST & DIAGNOSTICS (collapsed by default) ---
+        section(title: "Test & Diagnostics", hideable: true, hidden: true) {
+            paragraph "Run a one-off cycle to verify lights are configured correctly. " +
+                      "Anchor lights will stay on until the session ends naturally or you use the clear option below."
+            if (state?.lastTestSummary) {
+                paragraph "<b>Last test:</b> ${state.lastTestSummary}"
+            }
+            input "runTestNow", "bool",
+                title: "Run a test cycle now",
+                defaultValue: false,
+                submitOnChange: false
+            input "clearTestNow", "bool",
+                title: "Clear test state (turn off anchor lights left on by test)",
+                defaultValue: false,
+                submitOnChange: false
         }
     }
 }
@@ -376,20 +578,22 @@ def pageSetup() {
 def Setup() {
 
     def newModeInput = [
-        name:         "newMode",
-        type:         "mode",
-        title:        "Modes (e.g., Away/Vacation)",
-        multiple:     true,
-        required:     false,
-        description:  "Optional. If left blank, Modes will not arm the app."
+        name:           "newMode",
+        type:           "mode",
+        title:          "Modes (e.g., Away/Vacation)",
+        multiple:       true,
+        required:       false,
+        submitOnChange: true,
+        description:    "Optional. If left blank, Modes will not arm the app."
     ]
     def vacationSwitchInput = [
-        name:         "vacationSwitch",
-        type:         "capability.switch",
-        title:        "Vacation switch (optional – ON enables app)",
-        required:     false,
-        multiple:     false,
-        description:  "Optional. If set, the app runs when this switch is ON OR when an allowed Mode is active. Switch ON also bypasses mode/time restrictions as a manual override."
+        name:           "vacationSwitch",
+        type:           "capability.switch",
+        title:          "Vacation switch (optional – ON enables app)",
+        required:       false,
+        multiple:       false,
+        submitOnChange: true,
+        description:    "Optional. If set, the app runs when this switch is ON OR when an allowed Mode is active. Switch ON also bypasses mode/time restrictions as a manual override."
     ]
     def switchesInput = [
         name:         "switches",
@@ -441,6 +645,7 @@ def Setup() {
             paragraph "Choose how vacation lighting is armed. You can use Modes, a Vacation switch, or both."
             input newModeInput
             input vacationSwitchInput
+            paragraph dynamicArmingSummary()
         }
 
         // Time window
@@ -595,6 +800,12 @@ def timeIntervalPage() {
                     required: false,
                     description: "Optional. If blank, no specific end time."
             }
+
+            // Show resolved window for today when both start and end are configured
+            def resolved = resolvedTimeWindow()
+            if (resolved) {
+                paragraph "<i style='color:#555;'>${resolved}</i>"
+            }
         }
     }
 }
@@ -625,8 +836,9 @@ def installed() {
 }
 
 def updated() {
-    // Snapshot test flag before re-init
-    def doTest = runTestNow
+    // Snapshot flags before re-init (settings are read at render time)
+    def doTest  = runTestNow
+    def doClear = clearTestNow
 
     unsubscribe()
     clearState(true, true)
@@ -635,8 +847,15 @@ def updated() {
     // Handle test AFTER normal initialization
     if (doTest) {
         runTestCycle()
-        // reset the toggle so it doesn't re-run next time
         app.updateSetting("runTestNow", [value: "false", type: "bool"])
+    }
+
+    // Clear test state: lights already turned off by clearState(true, true) above.
+    // Reset lastTestSummary and toggle so the UI reflects the cleared state.
+    if (doClear) {
+        state.lastTestSummary = null
+        app.updateSetting("clearTestNow", [value: "false", type: "bool"])
+        logInfo "[TEST] Test state cleared by user."
     }
 }
 
@@ -790,7 +1009,8 @@ def modeChangeHandler(evt) {
     if (!armOk) {
         logDebug "modeChangeHandler: armOk=false (mode='${location.mode}', switch='${vacationSwitch ? vacationSwitch.currentSwitch : "n/a"}') - clearing and unscheduling."
         sendSessionSummary("mode changed to '${location.mode}'")
-        clearState(true, true)
+        boolean wasRunning = state.Running || state.schedRunning
+        clearState(wasRunning, true)
     } else {
         logDebug "modeChangeHandler: armOk=true - scheduling vacation lighting."
         state.schedRunning = false
@@ -1116,6 +1336,13 @@ def runTestCycle() {
     Integer dOn = testOnNames.size()
     // dOff is 0 at test completion (offs will happen asynchronously later)
     Integer dOff = 0
+
+    // Store a short summary for display on the main page
+    def tz = getTimeZone()
+    def timeStr = tz ? new Date().format("MMM d, h:mm a", tz) : new Date().toString()
+    def lightsStr = testOnNames ? testOnNames.join(", ") : "none"
+    state.lastTestSummary = "Ran at ${timeStr}: ${dCycles} cycle, ${dOn} light(s) on — ${lightsStr}. " +
+                            "Anchor lights stay on until cleared or session ends."
 
     sendTestSummary(dCycles, dOn, dOff, testOnNames)
     // Test cycle is done.

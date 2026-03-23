@@ -1,10 +1,10 @@
 {
 	"packageName": "Vacation Lighting Simulator",
 	"author": "Jed Brown",
-	"version": "0.3.3",
-	"releaseNotes": "v0.3.3    Fix to ensure schedule maintains over multiple days, + option for notfications to be immediate after a session.\nv0.3.2.2  Bug fixes and improvements\n          Daily summary only sends if cycles > 0 and only schedules when armed\n          Warning displayed if Hubitat timezone is not configured\n          Fix to ensure lights turn off when app is disarmed\nv0.3.2    Vacation reliability and arming fixes\n          Parent/child architecture with Analyzer child\nv0.3.1    Analyzer accuracy improvements",
+	"version": "0.4.0",
+	"releaseNotes": "v0.4.0    UX improvements and bug fix\n          Configuration checklist on main page (✅/❌/⚠️ for each setting)\n          Dynamic arming summary in Setup (explains effective arming condition)\n          Enhanced status dashboard: arming context, time since last cycle, frequency info\n          Actionable Why-not-running diagnostics with specific hints\n          Test section collapsed by default; clear button + last test result displayed\n          Time window page shows resolved today's window for sunrise/sunset offsets\n          Fix: anchor lights no longer turned off during mode changes when app was not running\nv0.3.3    Fix to ensure schedule maintains over multiple days, + option for notfications to be immediate after a session.\nv0.3.2.2  Bug fixes and improvements\n          Daily summary only sends if cycles > 0 and only schedules when armed\n          Warning displayed if Hubitat timezone is not configured\n          Fix to ensure lights turn off when app is disarmed\nv0.3.2    Vacation reliability and arming fixes\n          Parent/child architecture with Analyzer child\nv0.3.1    Analyzer accuracy improvements",
 	"minimumHEVersion": "0.0",
-	"dateReleased": "2026-02-19",
+	"dateReleased": "2026-03-23",
 	"apps" : [
 		{
 			"id" : "d5245dfd-7b76-4f31-8f61-bdc3a8e07c55",
