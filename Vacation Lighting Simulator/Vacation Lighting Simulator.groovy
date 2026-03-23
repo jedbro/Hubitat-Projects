@@ -1,6 +1,9 @@
 /**
  *  Vacation Lighting Simulator (Child)
 
+ *  V0.3.4 - March 2026
+ *    - Fix: anchor lights no longer turned off during mode changes when app was not running
+ *
  *  V0.3.3 - February 2026
  *    - Fix to ensure schedule maintains over multiple days
  *    - Option for notifications to be immediate after a session
@@ -58,7 +61,7 @@
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
-@Field static final String APP_VERSION = "v0.3.3 • Feb 2026"
+@Field static final String APP_VERSION = "v0.3.4 • Mar 2026"
 
 definition(
     name: "Vacation Lighting Simulator",
@@ -790,7 +793,8 @@ def modeChangeHandler(evt) {
     if (!armOk) {
         logDebug "modeChangeHandler: armOk=false (mode='${location.mode}', switch='${vacationSwitch ? vacationSwitch.currentSwitch : "n/a"}') - clearing and unscheduling."
         sendSessionSummary("mode changed to '${location.mode}'")
-        clearState(true, true)
+        boolean wasRunning = state.Running || state.schedRunning
+        clearState(wasRunning, true)
     } else {
         logDebug "modeChangeHandler: armOk=true - scheduling vacation lighting."
         state.schedRunning = false
